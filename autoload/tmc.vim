@@ -283,6 +283,55 @@ function! tmc#run_cli(args) abort
   return l:json
 endfunction
 
+function! tmc#run_cli_streaming(args) abort
+  call tmc#ensure_cli()
+
+  if type(a:args) != type([]) || empty(a:args)
+    call s:echo_error('No command provided to run_cli_streaming')
+    return []
+  endif
+
+  let l:first = a:args[0]
+  let l:top_level = ['run-tests','checkstyle','clean','compress-project',
+        \ 'extract-project','fast-available-points','find-exercises',
+        \ 'get-exercise-packaging-configuration',
+        \ 'list-local-tmc-course-exercises','prepare-solution',
+        \ 'prepare-stub','prepare-submission','refresh-course','settings',
+        \ 'scan-exercise','help']
+  if index(l:top_level, l:first) >= 0
+    let l:cmd_parts = [s:cli_path]
+    call extend(l:cmd_parts, a:args)
+  elseif l:first ==# 'tmc' || l:first ==# 'mooc'
+    let l:cmd_parts = [s:cli_path, l:first, '--client-name', s:client_name, '--client-version', s:client_version]
+    call extend(l:cmd_parts, a:args[1:])
+  else
+    let l:cmd_parts = [s:cli_path, 'tmc', '--client-name', s:client_name, '--client-version', s:client_version]
+    call extend(l:cmd_parts, a:args)
+  endif
+
+  let l:escaped = []
+  for p in l:cmd_parts
+    if match(p, '\s') != -1
+      call add(l:escaped, '"' . substitute(p, '"', '\\"', 'g') . '"')
+    else
+      call add(l:escaped, p)
+    endif
+  endfor
+  let l:cmd = join(l:escaped, ' ')
+
+  let l:lines = systemlist(l:cmd)
+  let l:objs = []
+  for ln in l:lines
+    try
+      call add(l:objs, json_decode(ln))
+    catch
+      " ignore non-JSON
+    endtry
+  endfor
+
+  return l:objs
+endfunction
+
 " Login to the TMC server.  Optionally accepts an email address; if omitted
 " the user is prompted.  Password is always prompted via inputsecret().
 function! tmc#login(...) abort
@@ -624,6 +673,11 @@ endfunction
 " read from course_config.toml if present; otherwise the user is prompted for it.
 
 
+
+
+
+" Submit the current exercise, streaming progress into a scratch buffer,
+" with async jobs if available, falling back to synchronous streaming.
 function! tmc#submit_current() abort
   call tmc#ensure_cli()
 
@@ -633,7 +687,6 @@ function! tmc#submit_current() abort
     return
   endif
 
-  " Determine the exercise ID
   let l:id = s:get_exercise_id(l:root)
   if empty(l:id)
     let l:id = input('Exercise ID: ')
@@ -643,64 +696,140 @@ function! tmc#submit_current() abort
     endif
   endif
 
-  let l:cmd = printf(
-        \ '%s tmc --client-name %s --client-version %s submit --exercise-id %s --submission-path %s',
-        \ s:cli_path,
-        \ s:client_name,
-        \ s:client_version,
-        \ shellescape(l:id),
-        \ shellescape(l:root)
-        \ )
+  " Open a new scratch buffer for live output
+  tabnew
+  setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+  file tmc-submit
+  let g:tmc_submit_buf = bufnr('%')
+  let g:tmc_submit_last = {}
 
-  " Run and capture every JSON line
-  let l:lines = systemlist(l:cmd)
+  " 4) Build the CLI command
+  let l:cmd = [
+        \ s:cli_path, 'tmc',
+        \ '--client-name', s:client_name, '--client-version', s:client_version,
+        \ 'submit',
+        \ '--exercise-id', l:id,
+        \ '--submission-path', l:root
+        \ ]
 
-  " Echo each progress‐update as it arrives
-  let l:last = {}
-  for l:ln in l:lines
-    try
-      let l:obj = json_decode(l:ln)
-    catch
-      " not JSON — skip
-      continue
-    endtry
-
-    if get(l:obj, 'output-kind', '') ==# 'status-update'
-      " show percent + message
-      echom printf('[%3.0f%%] %s', get(l:obj, 'percent-done', 0.0) * 100, l:obj['message'])
-    elseif get(l:obj, 'output-kind', '') ==# 'output-data'
-      let l:last = l:obj
-    endif
-  endfor
-
-  " If we never saw a final output-data, error out
-  if empty(l:last)
-    call s:echo_error('Failed to parse final submission result')
+  " Async path for Neovim & Vim8+
+  if exists('*jobstart')
+    call jobstart(l:cmd, {
+          \ 'stdout_buffered': v:false,
+          \ 'on_stdout': function('s:Submit_on_stdout'),
+          \ 'on_exit':   function('s:Submit_on_exit'),
+          \ 'stderr':    'ignore',
+          \ })
+    return
+  " Async path for older Vim8
+  elseif exists('*job_start')
+    call job_start(l:cmd, {
+          \ 'stdout_buffered': v:false,
+          \ 'on_stdout': function('s:Submit_on_stdout'),
+          \ 'on_exit':   function('s:Submit_on_exit'),
+          \ 'stderr':    'ignore',
+          \ })
     return
   endif
 
-  " Process the final result
-  let l:res = l:last
-  let l:data = l:res['data']['output-data']
+  " Fallback: synchronous streaming via run_cli_streaming()
+  let l:objs = tmc#run_cli_streaming(l:cmd)
+  if empty(l:objs)
+    return
+  endif
 
-  " Show overall status
-  echom printf('%s: %s',
-        \ l:res['status'],
-        \ has_key(l:res, 'message') ? l:res['message'] : '')
+  " Process each JSON object in order
+  let l:last = {}
+  for obj in l:objs
+    if get(obj, 'output-kind', '') ==# 'status-update'
+      call appendbufline(g:tmc_submit_buf, '$', printf('[%3.0f%%] %s', obj['percent-done']*100, obj['message']))
+    elseif get(obj, 'output-kind', '') ==# 'output-data'
+      let l:last = obj
+    endif
+  endfor
 
+  if empty(l:last)
+    call appendbufline(g:tmc_submit_buf, '$', 'Failed to parse final submission result')
+    return
+  endif
+
+  " Summarize final result
+  call appendbufline(g:tmc_submit_buf, '$', printf('%s: %s', l:last['status'], l:last['message']))
+  let l:data = l:last['data']['output-data']
   if get(l:data, 'all_tests_passed', v:false)
-    echom '✅ All tests passed!'
+    call appendbufline(g:tmc_submit_buf, '$', '✅ All tests passed!')
   else
-    echom '❌ Some tests failed:'
+    call appendbufline(g:tmc_submit_buf, '$', '❌ Some tests failed:')
     for tc in get(l:data, 'test_cases', [])
       if !tc['successful']
-        echom printf('  • %s: %s', tc['name'], substitute(tc['message'], '\n', '\\n', 'g'))
+        call appendbufline(g:tmc_submit_buf, '$', printf('  • %s: %s', tc['name'], substitute(tc['message'], '\n', '\\n', 'g')))
       endif
     endfor
   endif
-
-  echom 'Submission URL: ' . l:data['submission_url']
+  call appendbufline(g:tmc_submit_buf, '$', 'Submission URL: ' . l:data['submission_url'])
 endfunction
+
+
+" Callback: handle each stdout line from the async job
+function! s:Submit_on_stdout(job_id, data, event) abort
+  for line in a:data
+    if empty(line) | continue | endif
+    try
+      let obj = json_decode(line)
+    catch
+      continue
+    endtry
+
+    if get(obj, 'output-kind', '') ==# 'status-update'
+      " Append progress to the submit buffer
+      if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
+        call appendbufline(g:tmc_submit_buf, '$',
+              \ printf('[%3.0f%%] %s', obj['percent-done'] * 100, obj['message']))
+      endif
+    elseif get(obj, 'output-kind', '') ==# 'output-data'
+      let g:tmc_submit_last = obj
+    endif
+  endfor
+endfunction
+
+" Callback: when the async job exits, append the summary
+function! s:Submit_on_exit(job_id, data, event) abort
+  if empty(g:tmc_submit_last)
+    if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
+      call appendbufline(g:tmc_submit_buf, '$', 'Submission ended without result')
+    endif
+    return
+  endif
+
+  " Overall status line
+  if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
+    call appendbufline(g:tmc_submit_buf, '$',
+          \ printf('%s: %s',
+          \ g:tmc_submit_last['status'],
+          \ g:tmc_submit_last['message']))
+  endif
+
+  " Detailed results
+  let dat = g:tmc_submit_last['data']['output-data']
+  if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
+    if get(dat, 'all_tests_passed', v:false)
+      call appendbufline(g:tmc_submit_buf, '$', '✅ All tests passed!')
+    else
+      call appendbufline(g:tmc_submit_buf, '$', '❌ Some tests failed:')
+      for tc in get(dat, 'test_cases', [])
+        if !tc['successful']
+          call appendbufline(g:tmc_submit_buf, '$',
+                \ printf('  • %s: %s',
+                \ tc['name'],
+                \ substitute(tc['message'], '\n', '\\n', 'g')))
+        endif
+      endfor
+    endif
+    call appendbufline(g:tmc_submit_buf, '$',
+          \ 'Submission URL: ' . dat['submission_url'])
+  endif
+endfunction
+
 
 " Generic dispatcher: run an arbitrary tmc subcommand with arguments.  This
 " helper simply forwards its arguments to tmc#run_cli().  Use via
