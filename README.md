@@ -50,7 +50,7 @@ editor.
 | `:TmcSubmitCurrent` | Submits the exercise containing the current buffer.  The exercise ID is determined by reading `course_config.toml` in the course root to map the current exercise slug to its numeric ID.  If no mapping is found, you are prompted to enter the ID.  Uses the same submission command as `:TmcSubmit`. |
 | `:TmcSetOrg <slug>` | Changes the organisation slug used by `:TmcCourses`.  The slug corresponds to the parameter of the GetCourses command. |
 | `:TmcPickCourse` | Opens a popup menu to select an organisation and then a course.  Once a course is selected, its exercises are listed automatically. |
-| `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command.  The arguments you provide after `:Tmc` are passed directly to the CLI after the top‑level `tmc` subcommand.  For example, `:Tmc get-exercise-details --exercise-id 1234` invokes `tmc-langs-cli tmc get-exercise-details --exercise-id 1234`.  This allows you to access less common features such as `checkstyle`, `find-exercises`, `prepare-submission`, `settings list` and more, as documented in the CLI API【41537964680†L178-L188】. |
+| `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command.  The arguments you provide after `:Tmc` are passed directly to the CLI after the top‑level `tmc` subcommand.  For example, `:Tmc get-exercise-details --exercise-id 1234` invokes `tmc-langs-cli tmc get-exercise-details --exercise-id 1234`.  This allows you to access less common features such as `checkstyle`, `find-exercises`, `prepare-submission`, `settings list` and more, as documented in the CLI API. |
 
 Additional variables:
 
