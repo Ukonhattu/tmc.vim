@@ -76,30 +76,47 @@ endfunction
 " Linux return the architecture combined with unknown-linux-gnu.  If an
 " unsupported architecture is encountered, fallback to x86_64-unknown-linux-gnu.
 function! s:detect_target() abort
-  if has('win32') || has('win64')
-    return 'x86_64-pc-windows-msvc'
-  endif
   let l:uname_s = substitute(system('uname -s'), '\n', '', 'g')
   let l:uname_m = substitute(system('uname -m'), '\n', '', 'g')
-  if l:uname_s ==# 'Darwin'
+
+  " Windows
+  if has('win32') || has('win64')
+    if l:uname_m =~# '^i686'
+      return 'i686-pc-windows-msvc'
+    else
+      return 'x86_64-pc-windows-msvc'
+    endif
+
+  " macOS
+  elseif l:uname_s ==# 'Darwin'
     if l:uname_m ==# 'x86_64'
       return 'x86_64-apple-darwin'
     else
-      " Assume Apple Silicon (aarch64)
       return 'aarch64-apple-darwin'
     endif
+
+  " Linux
+  elseif l:uname_s ==# 'Linux'
+    if l:uname_m =~# '^x86_64'
+      let l:ldd = system('ldd --version 2>&1')
+      if l:ldd =~? 'musl'
+        return 'x86_64-unknown-linux-musl'
+      else
+        return 'x86_64-unknown-linux-gnu'
+      endif
+    elseif l:uname_m =~# '^\(i686\|i386\)$'
+      return 'i686-unknown-linux-gnu'
+    elseif l:uname_m ==# 'aarch64'
+      return 'aarch64-unknown-linux-gnu'
+    elseif l:uname_m =~# '^armv7'
+      return 'armv7-unknown-linux-gnueabihf'
+    endif
   endif
-  " Linux – map known architectures
-  if l:uname_m ==# 'x86_64'
-    return 'x86_64-unknown-linux-gnu'
-  elseif l:uname_m ==# 'i686' || l:uname_m ==# 'i386'
-    return 'i686-unknown-linux-gnu'
-  elseif l:uname_m ==# 'aarch64'
-    return 'aarch64-unknown-linux-gnu'
-  endif
-  " Fallback to x86_64-unknown-linux-gnu
+
+  " Fallback
   return 'x86_64-unknown-linux-gnu'
 endfunction
+
 
 " Download the tmc-langs-cli binary into the given path.  The function
 " constructs a download URL based on the detected target triple and a
