@@ -4,6 +4,7 @@ THIS IS A WIP VERSION.
 However, it is minimally usable. You can login, select org, select course, download exercises, run tests andsubmit exercises. Readme might be a bit behind, so message me / open issue if you have problems.
 
 Tested only with neovim so far. I will test it with vim too at some point and intend to keep it compatible with both.
+
 --
 
 `tmc.vim` is a simple Vim plugin that integrates the
