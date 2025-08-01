@@ -606,11 +606,10 @@ endfunction
 " directory) and an --exercise-id.  The exercise id is
 " read from course_config.toml if present; otherwise the user is prompted for it.
 
+
 function! tmc#submit_current() abort
-  " Ensure we have a working CLI binary
   call tmc#ensure_cli()
 
-  " Find exercise root
   let l:root = s:find_exercise_root()
   if empty(l:root)
     call s:echo_error('Could not locate exercise root (.tmcproject.yml not found)')
@@ -627,45 +626,64 @@ function! tmc#submit_current() abort
     endif
   endif
 
-  " Build and run the CLI submit command, capturing every JSON line
-  let l:cmd_parts = [
+  let l:cmd = printf(
+        \ '%s tmc --client-name %s --client-version %s submit --exercise-id %s --submission-path %s',
         \ s:cli_path,
-        \ 'tmc', '--client-name', s:client_name, '--client-version', s:client_version,
-        \ 'submit',
-        \ '--exercise-id', l:id,
-        \ '--submission-path', shellescape(l:root)
-        \ ]
-  let l:lines = systemlist(join(l:cmd_parts, ' '))
+        \ s:client_name,
+        \ s:client_version,
+        \ shellescape(l:id),
+        \ shellescape(l:root)
+        \ )
 
-  " Parse only the final “output-data” JSON object
-  let l:result = {}
+  " Run and capture every JSON line
+  let l:lines = systemlist(l:cmd)
+
+  " Echo each progress‐update as it arrives
+  let l:last = {}
   for l:ln in l:lines
     try
       let l:obj = json_decode(l:ln)
-      if has_key(l:obj, 'output-kind') && l:obj['output-kind'] ==# 'output-data'
-        let l:result = l:obj
-      endif
     catch
-      " skip non-JSON or status-update lines
+      " not JSON — skip
+      continue
     endtry
+
+    if get(l:obj, 'output-kind', '') ==# 'status-update'
+      " show percent + message
+      echom printf('[%3.0f%%] %s', get(l:obj, 'percent-done', 0.0) * 100, l:obj['message'])
+    elseif get(l:obj, 'output-kind', '') ==# 'output-data'
+      let l:last = l:obj
+    endif
   endfor
 
-  if empty(l:result)
-    call s:echo_error('Failed to parse submission result')
+  " If we never saw a final output-data, error out
+  if empty(l:last)
+    call s:echo_error('Failed to parse final submission result')
     return
   endif
 
-  " Extract the payload and echo a summary
-  let l:data = l:result['data']['output-data']
-  echom printf('Submission %s: %s', l:result['status'], l:result['message'])
+  " Process the final result
+  let l:res = l:last
+  let l:data = l:res['data']['output-data']
+
+  " Show overall status
+  echom printf('%s: %s',
+        \ l:res['status'],
+        \ has_key(l:res, 'message') ? l:res['message'] : '')
+
   if get(l:data, 'all_tests_passed', v:false)
     echom '✅ All tests passed!'
   else
-    echom '❌ Some tests failed. See details above.'
+    echom '❌ Some tests failed:'
+    for tc in get(l:data, 'test_cases', [])
+      if !tc['successful']
+        echom printf('  • %s: %s', tc['name'], substitute(tc['message'], '\n', '\\n', 'g'))
+      endif
+    endfor
   endif
+
   echom 'Submission URL: ' . l:data['submission_url']
 endfunction
-
 
 " Generic dispatcher: run an arbitrary tmc subcommand with arguments.  This
 " helper simply forwards its arguments to tmc#run_cli().  Use via
