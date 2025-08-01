@@ -1,8 +1,12 @@
 # TMC-Vim
+
 THIS IS A WIP VERSION.  
 However, it is minimally usable. You can login, select org, select course, download exercises, run tests andsubmit exercises. Readme might be a bit behind, so message me / open issue if you have problems.
 
-`vim‑tmc` is a simple Vim plugin that integrates the
+Tested only with neovim so far. I will test it with vim too at some point and intend to keep it compatible with both.
+--
+
+`tmc.vim` is a simple Vim plugin that integrates the
 [tmc‑langs‑cli](https://github.com/rage/tmc-langs-rust/tree/main/crates/tmc-langs-cli) into Vim.  It allows you to
 log in to the Test‑My‑Code service, list courses and exercises, download
 exercise templates and submit completed exercises – all without leaving the
@@ -33,7 +37,7 @@ editor.
    Plug 'ukonhattu/tmc.vim'
    ```
 
-   [Lazy](https://https://github.com/folke/lazy.nvim)
+   [Lazy](https://https://github.com/folke/lazy.nvim) (neovim)
    ```lua
    { 'ukonhattu/tmc.vim' }
    ```
@@ -56,8 +60,10 @@ editor.
 | `:TmcRunTests` | Runs tests for the exercise containing the current buffer.  The plugin calls the CLI’s `run-tests` subcommand with the exercise directory as `--exercise-path` and displays the output in a scratch buffer. |
 | `:TmcSubmitCurrent` | Submits the exercise containing the current buffer.  The exercise ID is determined by reading `course_config.toml` in the course root to map the current exercise slug to its numeric ID.  If no mapping is found, you are prompted to enter the ID.  Uses the same submission command as `:TmcSubmit`. |
 | `:TmcSetOrg <slug>` | Changes the organisation slug used by `:TmcCourses`.  The slug corresponds to the parameter of the GetCourses command. |
-| `:TmcPickCourse` | Opens a popup menu to select an organisation and then a course.  Once a course is selected, its exercises are listed automatically. |
-| `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command.  The arguments you provide after `:Tmc` are passed directly to the CLI after the top‑level `tmc` subcommand.  For example, `:Tmc get-exercise-details --exercise-id 1234` invokes `tmc-langs-cli tmc get-exercise-details --exercise-id 1234`.  This allows you to access less common features such as `checkstyle`, `find-exercises`, `prepare-submission`, `settings list` and more, as documented in the CLI API. |
+| `:TmcPickCourse` | Opens a popup menu to select an organisation (if not set) and then a course.  Once a course is selected, its exercises are listed automatically. |
+|`:TmcPickOrg` | Opens a popip menu select an organisation.
+|`:TmcCdCourse`| Change vim's current working directory to the last picked course
+| `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command. If running  `tmc` or `mooc` subcommand, --client-name and --client-version are automatically added to the command. Mooc command has not been tested yet.|
 
 Additional variables:
 
@@ -68,21 +74,13 @@ Additional variables:
 
 ## Notes
 
-* All commands rely on JSON output from `tmc‑langs‑cli`.  If parsing fails or
-  the command exits with a non‑zero status, an error message is displayed.
-* The plugin identifies itself to the TMC service using the client name
-  `tmc-vim` and version `0.1.0`.  You can override these values by setting
-  `g:tmc_client_name` and `g:tmc_client_version` in your `vimrc`.  They
-  correspond to the `--client-name` and `--client-version` flags required by
-  the CLI.
 * To list courses in organisations other than `mooc`, call `:TmcSetOrg` or set
   `g:tmc_organization` in your `vimrc`.
 * When working inside a downloaded exercise, you can run tests and submit
   without remembering exercise IDs.  By default `<leader>tt` calls
   `:TmcRunTests` and `<leader>ts` calls `:TmcSubmitCurrent`.  These mappings
   can be disabled by setting `g:tmc_disable_default_mappings`.
-* Consider using Vim’s `job_start()`/`jobstart()` API for asynchronous
-  execution if you find that downloads or submissions block the editor.
+* Current Workflow is to run `:TmcPickCourse` -> `:TmcCdCourse`, navigate however you want to the exercise, when in exercise you can run `<leader>tt` to run tests and `<leader>ts` to submit. (or `:TmcRunRests` and `:TmcSubmitCurrent`)
 
 ## License
 
