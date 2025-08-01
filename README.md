@@ -1,4 +1,6 @@
 # Vim‑TMC
+THIS IS A WIP VERSION AND NOT READY FOR USE.
+
 
 `vim‑tmc` is a simple Vim plugin that integrates the
 [tmc‑langs‑cli](https://github.com/rage/tmc-langs-rust/tree/main/crates/tmc-langs-cli) into Vim.  It allows you to
