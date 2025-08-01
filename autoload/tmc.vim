@@ -1,4 +1,3 @@
- autoload/tmc.vim
 "
 " This file implements helper functions for the Vim‑TMC plugin.  The functions
 " execute `tmc‑langs‑cli` via system() and parse its JSON output using
@@ -495,7 +494,7 @@ endfunction
 
 " Set the active organisation slug for course listing.  This value is stored
 " in g:tmc_organization and will be used by tmc#list_courses.  The slug
-" corresponds to the organisation parameter of the CLI's GetCourses command【419357596652847†L351-L357】.
+" corresponds to the organisation parameter of the CLI's GetCourses command.
 function! tmc#set_organization(org) abort
   let g:tmc_organization = a:org
   echom 'Set TMC organisation to ' . a:org
@@ -606,12 +605,19 @@ endfunction
 " tmc submit command, which takes both a --submission-path (the exercise
 " directory) and an --exercise-id.  The exercise id is
 " read from course_config.toml if present; otherwise the user is prompted for it.
+
 function! tmc#submit_current() abort
+  " Ensure we have a working CLI binary
+  call tmc#ensure_cli()
+
+  " 1) Find exercise root
   let l:root = s:find_exercise_root()
   if empty(l:root)
     call s:echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
+
+  " 2) Determine the exercise ID
   let l:id = s:get_exercise_id(l:root)
   if empty(l:id)
     let l:id = input('Exercise ID: ')
@@ -620,17 +626,46 @@ function! tmc#submit_current() abort
       return
     endif
   endif
-  let l:json = tmc#run_cli(['submit','--exercise-id', l:id,
-        \ '--submission-path', l:root])
-  if empty(l:json)
+
+  " 3) Build and run the CLI submit command, capturing every JSON line
+  let l:cmd_parts = [
+        \ s:cli_path,
+        \ 'tmc', '--client-name', s:client_name, '--client-version', s:client_version,
+        \ 'submit',
+        \ '--exercise-id', l:id,
+        \ '--submission-path', shellescape(l:root)
+        \ ]
+  let l:lines = systemlist(join(l:cmd_parts, ' '))
+
+  " 4) Parse only the final “output-data” JSON object
+  let l:result = {}
+  for l:ln in l:lines
+    try
+      let l:obj = json_decode(l:ln)
+      if has_key(l:obj, 'output-kind') && l:obj['output-kind'] ==# 'output-data'
+        let l:result = l:obj
+      endif
+    catch
+      " skip non-JSON or status-update lines
+    endtry
+  endfor
+
+  if empty(l:result)
+    call s:echo_error('Failed to parse submission result')
     return
   endif
-  if has_key(l:json, 'status') && has_key(l:json, 'message')
-    echom l:json['status'] . ': ' . l:json['message']
+
+  " 5) Extract the payload and echo a summary
+  let l:data = l:result['data']['output-data']
+  echom printf('Submission %s: %s', l:result['status'], l:result['message'])
+  if get(l:data, 'all_tests_passed', v:false)
+    echom '✅ All tests passed!'
   else
-    echom 'Submitted exercise ' . l:id
+    echom '❌ Some tests failed. See details above.'
   endif
+  echom 'Submission URL: ' . l:data['submission_url']
 endfunction
+
 
 " Generic dispatcher: run an arbitrary tmc subcommand with arguments.  This
 " helper simply forwards its arguments to tmc#run_cli().  Use via
