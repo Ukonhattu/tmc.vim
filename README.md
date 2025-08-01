@@ -1,4 +1,4 @@
-# Vim‑TMC
+# TMC-Vim
 THIS IS A WIP VERSION.  
 However, it is minimally usable. You can login, select org, select course, download exercises, run tests andsubmit exercises. Readme might be a bit behind, so message me / open issue if you have problems.
 
@@ -30,7 +30,12 @@ editor.
    your `.vimrc`:
 
    ```vim
-   Plug '~/vim-tmc'
+   Plug 'ukonhattu/tmc.vim'
+   ```
+
+   [Lazy](https://https://github.com/folke/lazy.nvim)
+   ```lua
+   { 'ukonhattu/tmc.vim' }
    ```
 
    Or manually copy the `vim‑tmc` directory into `~/.vim/pack/tmc/start`.
