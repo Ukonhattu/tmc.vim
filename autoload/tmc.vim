@@ -610,14 +610,14 @@ function! tmc#submit_current() abort
   " Ensure we have a working CLI binary
   call tmc#ensure_cli()
 
-  " 1) Find exercise root
+  " Find exercise root
   let l:root = s:find_exercise_root()
   if empty(l:root)
     call s:echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
 
-  " 2) Determine the exercise ID
+  " Determine the exercise ID
   let l:id = s:get_exercise_id(l:root)
   if empty(l:id)
     let l:id = input('Exercise ID: ')
@@ -627,7 +627,7 @@ function! tmc#submit_current() abort
     endif
   endif
 
-  " 3) Build and run the CLI submit command, capturing every JSON line
+  " Build and run the CLI submit command, capturing every JSON line
   let l:cmd_parts = [
         \ s:cli_path,
         \ 'tmc', '--client-name', s:client_name, '--client-version', s:client_version,
@@ -637,7 +637,7 @@ function! tmc#submit_current() abort
         \ ]
   let l:lines = systemlist(join(l:cmd_parts, ' '))
 
-  " 4) Parse only the final “output-data” JSON object
+  " Parse only the final “output-data” JSON object
   let l:result = {}
   for l:ln in l:lines
     try
@@ -655,7 +655,7 @@ function! tmc#submit_current() abort
     return
   endif
 
-  " 5) Extract the payload and echo a summary
+  " Extract the payload and echo a summary
   let l:data = l:result['data']['output-data']
   echom printf('Submission %s: %s', l:result['status'], l:result['message'])
   if get(l:data, 'all_tests_passed', v:false)
