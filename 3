@@ -767,130 +767,130 @@ function! tmc#run_tests_current() abort
     return
   endif
 
-  " Open scratch buffer
+  " Open a new scratch buffer for live test output
   tabnew
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   file tmc-test
   let g:tmc_test_buf = bufnr('%')
-  let g:tmc_test_json = ''
-  let g:tmc_test_logs = []
+  let g:tmc_test_last = {}
 
-  " Enable syntax highlighting for test results
-  setlocal syntax=tmcresult
-
-  " Spinner
-  let g:tmc_spinner_frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']
-  let g:tmc_spinner_index = 0
-  call setline(1, '⠋ Running tests...')
-  let g:tmc_spinner_timer = timer_start(100, 's:RunTests_spinner_tick', {'repeat': -1})
-
-  " CLI command
-  let l:cmd = [s:cli_path,
+  " Build CLI command
+  let l:cmd = [s:cli_path, 'tmc',
+        \ '--client-name', s:client_name, '--client-version', s:client_version,
         \ 'run-tests', '--exercise-path', l:root
         \ ]
 
-  call jobstart(l:cmd, {
-        \ 'stdout_buffered': v:false,
-        \ 'stderr_buffered': v:false,
-        \ 'on_stdout': {j, d, e -> s:RunTests_on_output(j, d)},
-        \ 'on_stderr': {j, d, e -> s:RunTests_on_output(j, d)},
-        \ 'on_exit':   function('s:RunTests_finalize'),
-        \ })
-endfunction
-
-function! s:RunTests_spinner_tick(timer) abort
-  if !exists('g:tmc_test_buf') || !bufloaded(g:tmc_test_buf)
-    call timer_stop(a:timer)
+  " Async job
+  if exists('*jobstart')
+    call jobstart(l:cmd, {
+          \ 'stdout_buffered': v:false,
+          \ 'on_stdout': function('s:RunTests_on_stdout'),
+          \ 'on_exit':   function('s:RunTests_on_exit'),
+          \ 'stderr':    'ignore',
+          \ })
+    return
+  elseif exists('*job_start')
+    call job_start(l:cmd, {
+          \ 'stdout_buffered': v:false,
+          \ 'on_stdout': function('s:RunTests_on_stdout'),
+          \ 'on_exit':   function('s:RunTests_on_exit'),
+          \ 'stderr':    'ignore',
+          \ })
     return
   endif
-  let frame = g:tmc_spinner_frames[g:tmc_spinner_index]
-  let g:tmc_spinner_index = (g:tmc_spinner_index + 1) % len(g:tmc_spinner_frames)
-  call setbufline(g:tmc_test_buf, 1, frame . ' Running tests...')
+
+  " Fallback
+  let l:objs = tmc#run_cli_streaming(l:cmd)
+  call s:RunTests_process_output(l:objs)
 endfunction
 
-" Collect logs and final JSON
-function! s:RunTests_on_output(job_id, data) abort
+" Handle streaming output
+function! s:RunTests_on_stdout(job_id, data, event) abort
   for line in a:data
     if empty(line) | continue | endif
+    try
+      let obj = json_decode(line)
+    catch
+      " Non-JSON line
+      if exists('g:tmc_test_buf') && bufloaded(g:tmc_test_buf)
+        call appendbufline(g:tmc_test_buf, '$', line)
+      endif
+      continue
+    endtry
 
-    if line =~ '{' && line =~ 'output-data-kind' && line =~ 'test-result'
-      let g:tmc_test_json = line
-    else
-      " Replace literal \n with real line breaks for logs
-      let cleaned = substitute(line, '\\n', "\n", 'g')
-      call extend(g:tmc_test_logs, split(cleaned, "\n"))
+    if get(obj, 'output-kind', '') ==# 'status-update'
+      if exists('g:tmc_test_buf') && bufloaded(g:tmc_test_buf)
+        call appendbufline(g:tmc_test_buf, '$', printf('[%3.0f%%] %s',
+              \ obj['percent-done'] * 100, obj['message']))
+      endif
+    elseif get(obj, 'output-kind', '') ==# 'output-data'
+      let g:tmc_test_last = obj
     endif
   endfor
 endfunction
 
-" Finalize: write logs + results
-function! s:RunTests_finalize(job_id, code, event) abort
-  if exists('g:tmc_spinner_timer')
-    call timer_stop(g:tmc_spinner_timer)
-    unlet g:tmc_spinner_timer
-  endif
-
-  if !exists('g:tmc_test_buf') || !bufloaded(g:tmc_test_buf)
+" When job completes
+function! s:RunTests_on_exit(job_id, data, event) abort
+  if empty(g:tmc_test_last)
+    if exists('g:tmc_test_buf') && bufloaded(g:tmc_test_buf)
+      call appendbufline(g:tmc_test_buf, '$', '❌ Tests ended without result')
+    endif
     return
   endif
 
-  " Clear spinner line
-  call deletebufline(g:tmc_test_buf, 1)
-
-  " Write logs
-  if !empty(g:tmc_test_logs)
-    call appendbufline(g:tmc_test_buf, '$', '--- Logs ---')
-    call appendbufline(g:tmc_test_buf, '$', g:tmc_test_logs)
-    call appendbufline(g:tmc_test_buf, '$', ' ')
-  endif
-
-  " Parse final JSON
-  if empty(g:tmc_test_json)
-    call appendbufline(g:tmc_test_buf, '$', '❌ No test results found')
-    normal! G
-    return
-  endif
-
-  try
-    let obj = json_decode(g:tmc_test_json)
-  catch
-    call appendbufline(g:tmc_test_buf, '$', '❌ Failed to parse test results')
-    normal! G
-    return
-  endtry
-
-  let dat = obj['data']['output-data']
-  let results = get(dat, 'testResults', [])
-  let failed = 0
-  let total = len(results)
-
-  call appendbufline(g:tmc_test_buf, '$', '--- Results ---')
-  for tc in results
-    let name = get(tc, 'name', 'Unnamed test')
-    let message = substitute(get(tc, 'message', ''), '\\n', "\n", 'g')
-    if get(tc, 'successful', v:false)
-      call appendbufline(g:tmc_test_buf, '$', '✅ ' . name)
+  let dat = g:tmc_test_last['data']['output-data']
+  if exists('g:tmc_test_buf') && bufloaded(g:tmc_test_buf)
+    if get(dat, 'all_tests_passed', v:false)
+      call appendbufline(g:tmc_test_buf, '$', '✅ All tests passed!')
     else
-      let failed += 1
-      call appendbufline(g:tmc_test_buf, '$', '❌ ' . name)
-      if !empty(message)
-        for l in split(message, "\n")
-          call appendbufline(g:tmc_test_buf, '$', '    ' . l)
-        endfor
-      endif
+      let failed = 0
+      for tc in get(dat, 'test_cases', [])
+        if !tc['successful']
+          let failed += 1
+          call appendbufline(g:tmc_test_buf, '$',
+                \ printf('  • %s: %s',
+                \ tc['name'],
+                \ substitute(tc['message'], '\n', '\\n', 'g')))
+        endif
+      endfor
+      call appendbufline(g:tmc_test_buf, '$', printf('❌ %d tests failed', failed))
+    endif
+  endif
+endfunction
+
+" Helper for sync fallback
+function! s:RunTests_process_output(objs) abort
+  let l:last = {}
+  for obj in a:objs
+    if get(obj, 'output-kind', '') ==# 'status-update'
+      call appendbufline(g:tmc_test_buf, '$',
+            \ printf('[%3.0f%%] %s', obj['percent-done'] * 100, obj['message']))
+    elseif get(obj, 'output-kind', '') ==# 'output-data'
+      let l:last = obj
     endif
   endfor
 
-  call appendbufline(g:tmc_test_buf, '$', ' ')
-  if failed == 0 && total > 0
-    call appendbufline(g:tmc_test_buf, '$', '✅ All tests passed!')
-  else
-    call appendbufline(g:tmc_test_buf, '$',
-          \ printf('❌ %d tests failed (out of %d)', failed, total))
+  if empty(l:last)
+    call appendbufline(g:tmc_test_buf, '$', '❌ Tests ended without result')
+    return
   endif
 
-  normal! G
-  unlet g:tmc_test_json g:tmc_test_logs
+  let dat = l:last['data']['output-data']
+  if get(dat, 'all_tests_passed', v:false)
+    call appendbufline(g:tmc_test_buf, '$', '✅ All tests passed!')
+  else
+    let failed = 0
+    for tc in get(dat, 'test_cases', [])
+      if !tc['successful']
+        let failed += 1
+        call appendbufline(g:tmc_test_buf, '$',
+              \ printf('  • %s: %s',
+              \ tc['name'],
+              \ substitute(tc['message'], '\n', '\\n', 'g')))
+      endif
+    endfor
+    call appendbufline(g:tmc_test_buf, '$', printf('❌ %d tests failed', failed))
+  endif
 endfunction
 
 
