@@ -842,11 +842,13 @@ function! s:RunTests_finalize(job_id, code, event) abort
     call appendbufline(g:tmc_test_buf, '$', '--- Logs ---')
     call appendbufline(g:tmc_test_buf, '$', g:tmc_test_logs)
     call appendbufline(g:tmc_test_buf, '$', ' ')
+    execute 'normal! G'
   endif
 
   " Parse final JSON
   if empty(g:tmc_test_json)
     call appendbufline(g:tmc_test_buf, '$', '❌ No test results found')
+    execute 'normal! G'
     normal! G
     return
   endif
@@ -855,6 +857,7 @@ function! s:RunTests_finalize(job_id, code, event) abort
     let obj = json_decode(g:tmc_test_json)
   catch
     call appendbufline(g:tmc_test_buf, '$', '❌ Failed to parse test results')
+    execute 'normal! G'
     normal! G
     return
   endtry
@@ -865,17 +868,21 @@ function! s:RunTests_finalize(job_id, code, event) abort
   let total = len(results)
 
   call appendbufline(g:tmc_test_buf, '$', '--- Results ---')
+  execute 'normal! G'
   for tc in results
     let name = get(tc, 'name', 'Unnamed test')
     let message = substitute(get(tc, 'message', ''), '\\n', "\n", 'g')
     if get(tc, 'successful', v:false)
       call appendbufline(g:tmc_test_buf, '$', '✅ ' . name)
+      execute 'normal! G'
     else
       let failed += 1
       call appendbufline(g:tmc_test_buf, '$', '❌ ' . name)
+      execute 'normal! G'
       if !empty(message)
         for l in split(message, "\n")
           call appendbufline(g:tmc_test_buf, '$', '    ' . l)
+          execute 'normal! G'
         endfor
       endif
     endif
@@ -884,9 +891,11 @@ function! s:RunTests_finalize(job_id, code, event) abort
   call appendbufline(g:tmc_test_buf, '$', ' ')
   if failed == 0 && total > 0
     call appendbufline(g:tmc_test_buf, '$', '✅ All tests passed!')
+    execute 'normal! G'
   else
     call appendbufline(g:tmc_test_buf, '$',
           \ printf('❌ %d tests failed (out of %d)', failed, total))
+    execute 'normal! G'
   endif
 
   normal! G
@@ -901,6 +910,7 @@ endfunction
 " read from course_config.toml if present; otherwise the user is prompted for it.
 " Results streaming progress into a scratch buffer,
 " with async jobs if available, falling back to synchronous streaming.
+f
 function! tmc#submit_current() abort
   call tmc#ensure_cli()
 
@@ -919,14 +929,15 @@ function! tmc#submit_current() abort
     endif
   endif
 
-  " Open a new scratch buffer for live output
+  " Open scratch buffer for live output
   tabnew
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   file tmc-submit
+  setlocal syntax=tmcresult
   let g:tmc_submit_buf = bufnr('%')
   let g:tmc_submit_last = {}
 
-  " 4) Build the CLI command
+  " Build the CLI command
   let l:cmd = [
         \ s:cli_path, 'tmc',
         \ '--client-name', s:client_name, '--client-version', s:client_version,
@@ -935,66 +946,27 @@ function! tmc#submit_current() abort
         \ '--submission-path', l:root
         \ ]
 
-  " Async path for Neovim & Vim8+
+  " Async path
   if exists('*jobstart')
     call jobstart(l:cmd, {
           \ 'stdout_buffered': v:false,
-          \ 'on_stdout': function('s:Submit_on_stdout'),
-          \ 'on_exit':   function('s:Submit_on_exit'),
+          \ 'on_stdout': function('s:Submit_on_stdout_pretty'),
+          \ 'on_exit':   function('s:Submit_on_exit_pretty'),
           \ 'stderr':    'ignore',
           \ })
     return
-  " Async path for older Vim8
   elseif exists('*job_start')
     call job_start(l:cmd, {
           \ 'stdout_buffered': v:false,
-          \ 'on_stdout': function('s:Submit_on_stdout'),
-          \ 'on_exit':   function('s:Submit_on_exit'),
+          \ 'on_stdout': function('s:Submit_on_stdout_pretty'),
+          \ 'on_exit':   function('s:Submit_on_exit_pretty'),
           \ 'stderr':    'ignore',
           \ })
     return
   endif
-
-  " Fallback: synchronous streaming via run_cli_streaming()
-  let l:objs = tmc#run_cli_streaming(l:cmd)
-  if empty(l:objs)
-    return
-  endif
-
-  " Process each JSON object in order
-  let l:last = {}
-  for obj in l:objs
-    if get(obj, 'output-kind', '') ==# 'status-update'
-      call appendbufline(g:tmc_submit_buf, '$', printf('[%3.0f%%] %s', obj['percent-done']*100, obj['message']))
-    elseif get(obj, 'output-kind', '') ==# 'output-data'
-      let l:last = obj
-    endif
-  endfor
-
-  if empty(l:last)
-    call appendbufline(g:tmc_submit_buf, '$', 'Failed to parse final submission result')
-    return
-  endif
-
-  " Summarize final result
-  call appendbufline(g:tmc_submit_buf, '$', printf('%s: %s', l:last['status'], l:last['message']))
-  let l:data = l:last['data']['output-data']
-  if get(l:data, 'all_tests_passed', v:false)
-    call appendbufline(g:tmc_submit_buf, '$', '✅ All tests passed!')
-  else
-    call appendbufline(g:tmc_submit_buf, '$', '❌ Some tests failed:')
-    for tc in get(l:data, 'test_cases', [])
-      if !tc['successful']
-        call appendbufline(g:tmc_submit_buf, '$', printf('  • %s: %s', tc['name'], substitute(tc['message'], '\n', '\\n', 'g')))
-      endif
-    endfor
-  endif
-  call appendbufline(g:tmc_submit_buf, '$', 'Submission URL: ' . l:data['submission_url'])
 endfunction
 
-
-" Callback: handle each stdout line from the async job
-function! s:Submit_on_stdout(job_id, data, event) abort
+function! s:Submit_on_stdout_pretty(job_id, data, event) abort
   for line in a:data
     if empty(line) | continue | endif
     try
@@ -1004,10 +976,10 @@ function! s:Submit_on_stdout(job_id, data, event) abort
     endtry
 
     if get(obj, 'output-kind', '') ==# 'status-update'
-      " Append progress to the submit buffer
       if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
         call appendbufline(g:tmc_submit_buf, '$',
-              \ printf('[%3.0f%%] %s', obj['percent-done'] * 100, obj['message']))
+              \ printf('⏳ %3.0f%% %s', obj['percent-done'] * 100, obj['message']))
+        execute 'normal! G'
       endif
     elseif get(obj, 'output-kind', '') ==# 'output-data'
       let g:tmc_submit_last = obj
@@ -1015,41 +987,40 @@ function! s:Submit_on_stdout(job_id, data, event) abort
   endfor
 endfunction
 
-" Callback: when the async job exits, append the summary
-function! s:Submit_on_exit(job_id, data, event) abort
+function! s:Submit_on_exit_pretty(job_id, data, event) abort
   if empty(g:tmc_submit_last)
     if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
-      call appendbufline(g:tmc_submit_buf, '$', 'Submission ended without result')
+      call appendbufline(g:tmc_submit_buf, '$', '❌ Submission ended without result')
+      execute 'normal! G'
     endif
     return
   endif
 
-  " Overall status line
-  if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
-    call appendbufline(g:tmc_submit_buf, '$',
-          \ printf('%s: %s',
-          \ g:tmc_submit_last['status'],
-          \ g:tmc_submit_last['message']))
-  endif
-
-  " Detailed results
   let dat = g:tmc_submit_last['data']['output-data']
   if exists('g:tmc_submit_buf') && bufloaded(g:tmc_submit_buf)
+    call appendbufline(g:tmc_submit_buf, '$',
+          \ printf('--- Results ---'))
+    execute 'normal! G'
     if get(dat, 'all_tests_passed', v:false)
       call appendbufline(g:tmc_submit_buf, '$', '✅ All tests passed!')
+      execute 'normal! G'
     else
       call appendbufline(g:tmc_submit_buf, '$', '❌ Some tests failed:')
+      execute 'normal! G'
       for tc in get(dat, 'test_cases', [])
         if !tc['successful']
           call appendbufline(g:tmc_submit_buf, '$',
-                \ printf('  • %s: %s',
+                \ printf('  ❌ %s: %s',
                 \ tc['name'],
                 \ substitute(tc['message'], '\n', '\\n', 'g')))
+        else
+          call appendbufline(g:tmc_submit_buf, '$',
+                \ printf('  ✅ %s passed', tc['name']))
+          execute 'normal! G'
         endif
       endfor
     endif
-    call appendbufline(g:tmc_submit_buf, '$',
-          \ 'Submission URL: ' . dat['submission_url'])
+    call appendbufline(g:tmc_submit_buf, '$', '🔗 Submission URL: ' . dat['submission_url'])
   endif
 endfunction
 
@@ -1296,10 +1267,11 @@ function! tmc#download_course_exercises(course_id, org, cb) abort
     return
   endif
 
-  " Open a scratch buffer for live output
+  " Open scratch buffer
   tabnew
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   file tmc-download
+  setlocal syntax=tmcresult
   let g:tmc_download_buf = bufnr('%')
 
   " Build CLI command
@@ -1310,17 +1282,15 @@ function! tmc#download_course_exercises(course_id, org, cb) abort
     call extend(l:args, ['--exercise-id', id])
   endfor
 
-  " Start async job
   call jobstart(l:args, {
         \ 'stdout_buffered': v:false,
-        \ 'on_stdout': function('s:Download_on_stdout_stream'),
-        \ 'on_exit':   {j, code, e -> s:Download_on_exit_stream(j, code, e, a:course_id, a:cb)},
+        \ 'on_stdout': function('s:Download_on_stdout_pretty'),
+        \ 'on_exit':   {j, code, e -> s:Download_on_exit_pretty(j, code, e, a:course_id, a:cb)},
         \ 'stderr':    'ignore',
         \ })
 endfunction
 
-
-function! s:Download_on_stdout_stream(job_id, data, event) abort
+function! s:Download_on_stdout_pretty(job_id, data, event) abort
   for line in a:data
     if empty(line) | continue | endif
     try
@@ -1331,18 +1301,16 @@ function! s:Download_on_stdout_stream(job_id, data, event) abort
 
     if get(obj, 'output-kind', '') ==# 'status-update' && has_key(obj, 'message')
       if exists('g:tmc_download_buf') && bufloaded(g:tmc_download_buf)
-        call appendbufline(g:tmc_download_buf, '$', obj['message'])
+        call appendbufline(g:tmc_download_buf, '$', '⏳ ' . obj['message'])
+        execute 'normal! G'  | " keep view scrolled to bottom
       endif
-    endif
-
-    " Store final output-data for summary
-    if get(obj, 'output-kind', '') ==# 'output-data'
+    elseif get(obj, 'output-kind', '') ==# 'output-data'
       let g:tmc_last_download_result = obj
     endif
   endfor
 endfunction
 
-function! s:Download_on_exit_stream(job_id, code, event, course_id, cb) abort
+function! s:Download_on_exit_pretty(job_id, code, event, course_id, cb) abort
   if a:code != 0
     call s:echo_error('Failed to download exercises for course ' . a:course_id)
     call a:cb('')
@@ -1350,6 +1318,11 @@ function! s:Download_on_exit_stream(job_id, code, event, course_id, cb) abort
   endif
 
   if exists('g:tmc_download_buf') && bufloaded(g:tmc_download_buf)
+    let downloaded_count = 0
+    let skipped_count = 0
+    let failed_count = 0
+    let failed_due_to_permission = 0
+
     call appendbufline(g:tmc_download_buf, '$', '✅ Download completed successfully')
 
     if exists('g:tmc_last_download_result')
@@ -1359,35 +1332,53 @@ function! s:Download_on_exit_stream(job_id, code, event, course_id, cb) abort
 
         " Downloaded
         if has_key(data, 'downloaded')
-          call appendbufline(g:tmc_download_buf, '$', 'Downloaded exercises:')
+          let downloaded_count = len(data['downloaded'])
+          call appendbufline(g:tmc_download_buf, '$', '--- Downloaded ---')
           for item in data['downloaded']
-            call appendbufline(g:tmc_download_buf, '$', '  • ' . item['exercise-slug'])
+            call appendbufline(g:tmc_download_buf, '$', '  ✅ ' . item['exercise-slug'])
           endfor
         endif
 
         " Skipped
         if has_key(data, 'skipped') && !empty(data['skipped'])
-          call appendbufline(g:tmc_download_buf, '$', 'Skipped exercises:')
+          let skipped_count = len(data['skipped'])
+          call appendbufline(g:tmc_download_buf, '$', '--- Skipped ---')
           for item in data['skipped']
-            call appendbufline(g:tmc_download_buf, '$', '  • ' . item['exercise-slug'])
+            call appendbufline(g:tmc_download_buf, '$', '  ⚠️  ' . item['exercise-slug'])
           endfor
         endif
 
         " Failed
         if has_key(data, 'failed') && !empty(data['failed'])
-          call appendbufline(g:tmc_download_buf, '$', 'Failed exercises:')
+          let failed_count = len(data['failed'])
+          call appendbufline(g:tmc_download_buf, '$', '--- Failed ---')
           for failure in data['failed']
             let ex_info = failure[0]
             let reason  = join(failure[1], ' ')
-            call appendbufline(g:tmc_download_buf, '$', '  • ' . ex_info['exercise-slug'] . ': ' . reason)
+            if reason =~? '403 Forbidden'
+              let failed_due_to_permission += 1
+            endif
+            call appendbufline(g:tmc_download_buf, '$', '  ❌ ' . ex_info['exercise-slug'] . ': ' . reason)
           endfor
         endif
       endif
       unlet g:tmc_last_download_result
     endif
+
+    " Add summary
+    call appendbufline(g:tmc_download_buf, '$', '--- Summary ---')
+    call appendbufline(g:tmc_download_buf, '$',
+          \ printf('✅ %d downloaded, ⚠️  %d skipped, ❌ %d failed',
+          \ downloaded_count, skipped_count, failed_count))
+
+    if failed_due_to_permission > 0
+      call appendbufline(g:tmc_download_buf, '$', '💡 Note: Some failures may be due to exercises requiring you to submit previous ones first.')
+    endif
+
+    execute 'normal! G'
   endif
 
   sleep 200m
   call a:cb(a:course_id)
-endfunction
+endfu
 

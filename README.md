@@ -61,7 +61,7 @@ editor.
 | `:TmcRunTests` | Runs tests for the exercise containing the current buffer.  The plugin calls the CLI’s `run-tests` subcommand with the exercise directory as `--exercise-path` and displays the output in a scratch buffer. |
 | `:TmcSubmitCurrent` | Submits the exercise containing the current buffer.  The exercise ID is determined by reading `course_config.toml` in the course root to map the current exercise slug to its numeric ID.  If no mapping is found, you are prompted to enter the ID.  Uses the same submission command as `:TmcSubmit`. |
 | `:TmcSetOrg <slug>` | Changes the organisation slug used by `:TmcCourses`.  The slug corresponds to the parameter of the GetCourses command. |
-| `:TmcPickCourse` | Opens a popup menu to select an organisation (if not set) and then a course.  Once a course is selected, its exercises are listed automatically. |
+| `:TmcPickCourse` | Opens a menu to select a course.  Once a course is selected, its exercises are downloaded automatically and then change working direcctory to the courses directory. Run this too if you want to update the exercises or download new ones. (Will add command for those later).  |
 |`:TmcPickOrg` | Opens a popip menu select an organisation.
 |`:TmcCdCourse`| Change vim's current working directory to the last picked course
 | `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command. If running  `tmc` or `mooc` subcommand, --client-name and --client-version are automatically added to the command. Mooc command has not been tested yet.|
@@ -72,6 +72,7 @@ Additional variables:
   `tmc‑langs‑cli`).
 * `g:tmc_organization` – default organisation slug used by `:TmcCourses`.  Initially set to `mooc`.
 * `g:tmc_disable_default_mappings` – if set to a non‑zero value, disables the default key mappings (`<leader>tt` to run tests and `<leader>ts` to submit).
+* If you want to change where exercises are downloaded, modify environment variable `TMC_LANGS_DEFAULT_PROJECTS_DIR`.
 
 ## Notes
 
@@ -81,7 +82,7 @@ Additional variables:
   without remembering exercise IDs.  By default `<leader>tt` calls
   `:TmcRunTests` and `<leader>ts` calls `:TmcSubmitCurrent`.  These mappings
   can be disabled by setting `g:tmc_disable_default_mappings`.
-* Current Workflow is to run `:TmcPickCourse` -> `:TmcCdCourse`, navigate however you want to the exercise, when in exercise you can run `<leader>tt` to run tests and `<leader>ts` to submit. (or `:TmcRunRests` and `:TmcSubmitCurrent`)
+* Current Workflow is to run `:TmcPickCourse` (This will cd to course directory too) (Now it defaults to mooc org, run `TmcPickOrg` to change), navigate however you want to the exercise, when in exercise you can run `<leader>tt` to run tests and `<leader>ts` to submit. (or `:TmcRunRests` and `:TmcSubmitCurrent`)
 
 ## License
 
