@@ -36,7 +36,7 @@ endfunction
 function! tmc#ui#select(items, prompt, cb) abort
   let l:list = copy(a:items)
   for i in range(len(l:list))
-    let l:list[i] = string(l:list[i])
+    let l:list[i] = '' . l:list[i]
   endfor
 
   let l:cb_id = s:ui_cb_next_id
@@ -142,14 +142,6 @@ function! tmc#ui#pick_organization(cb) abort
           call add(l:orgs, org['slug'])
         endif
       endfor
-    elseif has_key(l:json['data'], 'organizations')
-      for org in l:json['data']['organizations']
-        if has_key(org, 'slug') && has_key(org, 'name')
-          call add(l:orgs, printf('%s (%s)', org['slug'], org['name']))
-        elseif has_key(org, 'slug')
-          call add(l:orgs, org['slug'])
-        endif
-      endfor
     endif
   endif
 
@@ -162,7 +154,7 @@ function! tmc#ui#pick_organization(cb) abort
   call tmc#ui#select(l:orgs, 'Select organization:', {choice ->
         \ (empty(choice)
         \   ? call(a:cb, [''])
-        \   : call(a:cb, [substitute(trim(split(choice)[0]), "['\"`]", '', 'g')]))})
+        \   : call(a:cb, [split(choice)[0]]))})
 endfunction
 
 function! tmc#ui#pick_course(org, cb) abort
@@ -240,24 +232,14 @@ function! tmc#ui#pick_course_command() abort
   endif
 endfunction
 
-function! tmc#ui#pick_course_command() abort
-  if !exists('g:tmc_organization') || empty(g:tmc_organization)
-    call tmc#ui#pick_organization({org ->
-          \ (empty(org)
-          \   ? ''
-          \   : tmc#ui#handle_org_selection(org))})
-  else
-    call tmc#ui#pick_course(g:tmc_organization, {course_id -> tmc#ui#after_pick_course_async(g:tmc_organization, course_id)})
-  endif
-endfunction
 
 
 function! tmc#ui#handle_org_selection(org) abort
-  " Strip quotes/apostrophes and trim spaces
-  let l:org = substitute(trim(a:org), "['\"`]", '', 'g')
+  let l:org = trim(a:org)
   let g:tmc_organization = l:org
   call tmc#ui#pick_course(l:org, {course_id -> tmc#ui#after_pick_course_async(l:org, course_id)})
 endfunction
+
 
 
 function! tmc#ui#after_pick_course_async(org, course_id) abort
