@@ -3,9 +3,7 @@
 THIS IS A WIP VERSION.  
 However, it is minimally usable. You can login, select org, select course, download exercises, run tests andsubmit exercises. Readme might be a bit behind, so message me / open issue if you have problems.
 
-Tested only with neovim so far. I will test it with vim too at some point and intend to keep it compatible with both.
-
-NOTE: Broken on vim, working on it. (Works on neovim)
+Tested with Neovim with Telescope and with Vim with fzf.vim. Should work without any dependencies, but I haven't tested that properly yet.
 
 ----
 
