@@ -5,6 +5,8 @@ However, it is minimally usable. You can login, select org, select course, downl
 
 Tested only with neovim so far. I will test it with vim too at some point and intend to keep it compatible with both.
 
+NOTE: Broken on vim, working on it. (Works on neovim)
+
 ----
 
 `tmc.vim` is a simple Vim plugin that integrates the
