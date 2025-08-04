@@ -1,11 +1,10 @@
-
 if exists('g:loaded_tmc_submit')
   finish
 endif
 let g:loaded_tmc_submit = 1
 
 let s:last_result = {}
-let s:logs = []
+let g:tmc_submit_buf = -1
 
 " ===========================
 " Public: Submit current exercise
@@ -29,17 +28,16 @@ function! tmc#submit#current() abort
   endif
 
   let s:last_result = {}
-  let s:logs = []
 
   " Open scratch buffer
   tabnew
   setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
   file tmc-submit
   setlocal syntax=tmcresult
-  let l:buf = bufnr('%')
+  let g:tmc_submit_buf = bufnr('%')
 
   " Spinner
-  call tmc#spinner#start(l:buf, 'Submitting exercise...')
+  call tmc#spinner#start(g:tmc_submit_buf, 'Submitting exercise...')
 
   let l:cmd = [g:cli_path, 'tmc',
         \ '--client-name', g:client_name,
@@ -50,20 +48,21 @@ function! tmc#submit#current() abort
 
   if exists('*jobstart')
     call jobstart(l:cmd, {
+          \ 'pty': v:true,
           \ 'stdout_buffered': v:false,
           \ 'stderr_buffered': v:false,
           \ 'on_stdout': function('s:on_stdout_nvim'),
           \ 'on_stderr': function('s:on_stdout_nvim'),
-          \ 'on_exit':   {j, code, e -> s:on_exit(l:buf, code)},
+          \ 'on_exit':   {j, code, e -> s:on_exit(code)},
           \ })
   elseif exists('*job_start')
     call job_start(l:cmd, {
           \ 'out_cb': function('s:on_stdout_vim'),
           \ 'err_cb': function('s:on_stdout_vim'),
-          \ 'exit_cb': {ch, code -> s:on_exit(l:buf, code)},
+          \ 'exit_cb': {ch, code -> s:on_exit(code)},
           \ })
   else
-    call s:run_fallback(l:cmd, l:buf)
+    call s:run_fallback(l:cmd)
   endif
 endfunction
 
@@ -92,12 +91,19 @@ function! s:handle_stdout(lines) abort
     try
       let obj = json_decode(line)
     catch
-      call add(s:logs, line)
+      if bufloaded(g:tmc_submit_buf)
+        call appendbufline(g:tmc_submit_buf, '$', 'ℹ️ ' . line)
+        execute 'normal! G'
+      endif
       continue
     endtry
 
     if get(obj, 'output-kind', '') ==# 'status-update'
-      call add(s:logs, printf('⏳ %3.0f%% %s', obj['percent-done'] * 100, obj['message']))
+      if bufloaded(g:tmc_submit_buf)
+        call appendbufline(g:tmc_submit_buf, '$',
+              \ printf('⏳ %3.0f%% %s', obj['percent-done'] * 100, obj['message']))
+        execute 'normal! G'
+      endif
     elseif get(obj, 'output-kind', '') ==# 'output-data'
       let s:last_result = obj
     endif
@@ -107,45 +113,40 @@ endfunction
 " ===========================
 " Exit handler
 " ===========================
-function! s:on_exit(buf, code) abort
+function! s:on_exit(code) abort
   call tmc#spinner#stop()
-  call s:print_results(a:buf)
+  call s:print_results()
 endfunction
 
 " ===========================
 " Fallback (sync)
 " ===========================
-function! s:run_fallback(cmd, buf) abort
+function! s:run_fallback(cmd) abort
   let l:objs = tmc#cli#run_streaming(a:cmd)
   for obj in l:objs
     if get(obj, 'output-kind', '') ==# 'output-data'
       let s:last_result = obj
     endif
   endfor
-  call s:print_results(a:buf)
+  call s:print_results()
 endfunction
 
 " ===========================
 " Print results
 " ===========================
-function! s:print_results(buf) abort
-  if !bufloaded(a:buf)
+function! s:print_results() abort
+  if !bufloaded(g:tmc_submit_buf)
     return
   endif
 
-  if !empty(s:logs)
-    call appendbufline(a:buf, '$', '--- Progress ---')
-    call appendbufline(a:buf, '$', s:logs)
-  endif
-
   if empty(s:last_result)
-    call appendbufline(a:buf, '$', '❌ Submission ended without result')
+    call appendbufline(g:tmc_submit_buf, '$', '❌ Submission ended without result')
     execute 'normal! G'
     return
   endif
 
   let dat = s:last_result['data']['output-data']
-  call appendbufline(a:buf, '$', '--- Results ---')
+  call appendbufline(g:tmc_submit_buf, '$', '--- Results ---')
 
   let test_cases = get(dat, 'test_cases', [])
   let failed = 0
@@ -154,10 +155,10 @@ function! s:print_results(buf) abort
   if total > 0
     for tc in test_cases
       if get(tc, 'successful', v:false)
-        call appendbufline(a:buf, '$', '✅ ' . tc['name'])
+        call appendbufline(g:tmc_submit_buf, '$', '✅ ' . tc['name'])
       else
         let failed += 1
-        call appendbufline(a:buf, '$',
+        call appendbufline(g:tmc_submit_buf, '$',
               \ printf('❌ %s:\n%s',
               \ tc['name'],
               \ substitute(get(tc, 'message', ''), '\n', "\n", 'g')))
@@ -166,17 +167,15 @@ function! s:print_results(buf) abort
   endif
 
   if get(dat, 'all_tests_passed', v:false)
-    call appendbufline(a:buf, '$', '✅ All tests passed!')
+    call appendbufline(g:tmc_submit_buf, '$', '✅ All tests passed!')
   else
-    call appendbufline(a:buf, '$',
+    call appendbufline(g:tmc_submit_buf, '$',
           \ printf('❌ %d tests failed (out of %d)', failed, total))
   endif
 
   if has_key(dat, 'submission_url')
-    call appendbufline(a:buf, '$', '🔗 Submission URL: ' . dat['submission_url'])
+    call appendbufline(g:tmc_submit_buf, '$', '🔗 Submission URL: ' . dat['submission_url'])
   endif
 
   execute 'normal! G'
 endfunction
-
-

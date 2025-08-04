@@ -39,6 +39,14 @@ function! tmc#login(...) abort
   return call('tmc#auth#login', a:000)
 endfunction
 
+function! tmc#logout() abort
+  return tmc#auth#logout()
+endfunction
+
+function tmc#status() abort
+  return tmc#auth#status()
+endfunction
+
 " Submit
 function! tmc#submit_current() abort
   return tmc#submit#current()

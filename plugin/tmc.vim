@@ -35,6 +35,8 @@ command! -nargs=1 TmcListExercises call tmc#list_exercises(<f-args>)
 
 " Login to TMC
 command! -nargs=? TmcLogin call tmc#login(<f-args>)
+command! TmcLogout call tmc#logout()
+command! TmcStatus call tmc#status()
 
 " Change to course directory
 
