@@ -30,7 +30,7 @@ function! tmc#auth#login(...) abort
   " Pass the password via stdin with a trailing newline so the CLI reads it.
   let l:out = system(l:cmd, l:password . "\n")
   if v:shell_error
-    call s:echo_error('tmc-langs-cli login failed: ' . l:out)
+    call tmc#core#echo_error('tmc-langs-cli login failed: ' . l:out)
     return
   endif
   try
@@ -51,10 +51,10 @@ function! tmc#auth#logout() abort
   call tmc#cli#ensure()
 
   let l:cmd = [
-        \ tmc#cli#path(),
+        \ g:cli_path,
         \ 'tmc',
-        \ '--client-name', tmc#cli#client_name(),
-        \ '--client-version', tmc#cli#client_version(),
+        \ '--client-name', g:client_name,
+        \ '--client-version', g:client_version,
         \ 'logout'
         \ ]
 
@@ -83,10 +83,10 @@ function! tmc#auth#status() abort
   call tmc#cli#ensure()
 
   let l:cmd = [
-        \ tmc#cli#path(),
+        \ g:cli_path,
         \ 'tmc',
-        \ '--client-name', tmc#cli#client_name(),
-        \ '--client-version', tmc#cli#client_version(),
+        \ '--client-name', g:client_name,
+        \ '--client-version', g:client_version,
         \ 'logged-in'
         \ ]
 
