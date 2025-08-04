@@ -71,3 +71,6 @@ function! tmc#pick_organization_command() abort
   return tmc#ui#pick_organization_command()
 endfunction
 
+function! tmc#paste_current() abort
+  return tmc#paste#current()
+endfunction

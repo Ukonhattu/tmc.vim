@@ -42,6 +42,8 @@ command! TmcStatus call tmc#status()
 
 command! TmcCdCourse call tmc#cd_course()
 
+command! TmcPaste call tmc#paste_current()
+
 
 " ===========================
 " Key Mappings (optional)
