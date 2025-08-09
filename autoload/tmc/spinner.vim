@@ -36,19 +36,21 @@ endfunction
 " Stop spinner and clear line
 " ===========================
 function! tmc#spinner#stop() abort
-  if s:timer != -1
+  if exists('s:timer') && s:timer != -1
+    let l:t = s:timer
     let s:timer = -1
-    call timer_stop(s:timer)
+    call timer_stop(l:t)
   endif
 
   if s:bufnr != -1 && bufloaded(s:bufnr)
     " Delete spinner line if it exists
-      call deletebufline(s:bufnr, 1)
+    call deletebufline(s:bufnr, 1)
   endif
 
   let s:bufnr = -1
   let s:message = ''
 endfunction
+
 
 " ===========================
 " Internal tick handler

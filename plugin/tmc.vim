@@ -44,12 +44,21 @@ command! TmcCdCourse call tmc#cd_course()
 
 command! TmcPaste call tmc#paste_current()
 
+" --- Aliases that match README / common naming ---
+command! -nargs=0 TmcCourses     call tmc#list_courses()
+command! -nargs=1 TmcExercises   call tmc#list_exercises(<f-args>)
+command! -nargs=0 TmcPickOrg     call tmc#pick_organization_command()
 
 " ===========================
 " Key Mappings (optional)
 " ===========================
-" Uncomment or adjust as needed
-nnoremap <leader>tt :TmcRunTests<CR>
-nnoremap <leader>ts :TmcSubmit<CR>
-nnoremap <leader>td :TmcDownload<CR>
+" Provide <Plug> targets so users can remap cleanly
+nnoremap <silent> <Plug>(tmc-run-tests)        :TmcRunTests<CR>
+nnoremap <silent> <Plug>(tmc-submit-current)   :TmcSubmit<CR>
+
+" Default leader mappings (can be disabled)
+if !get(g:, 'tmc_disable_default_mappings', 0)
+  nmap <silent> <leader>tt <Plug>(tmc-run-tests)
+  nmap <silent> <leader>ts <Plug>(tmc-submit-current)
+endif
 
