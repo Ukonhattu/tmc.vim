@@ -116,7 +116,7 @@ function! s:verify_sha256(sha_url, path) abort
 
     " Compute sha256 of the binary
     if exists('*sha256')
-      let l:data = join(readfile(a:path, 'b'), '\n')
+      let l:data = join(readfile(a:path, 'b'), '')
       let l:actual = sha256(l:data)
     elseif executable('sha256sum')
       let l:actual = matchstr(system(['sha256sum', a:path]), '\v^[0-9a-f]{64}')
