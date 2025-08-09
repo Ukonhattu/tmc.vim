@@ -44,6 +44,9 @@ command! TmcCdCourse call tmc#cd_course()
 
 command! TmcPaste call tmc#paste_current()
 
+" Inspect resolved projects directory (for debugging)
+command! TmcProjectsDir echo tmc#projects_dir()
+
 " --- Aliases that match README / common naming ---
 command! -nargs=0 TmcCourses     call tmc#list_courses()
 command! -nargs=1 TmcExercises   call tmc#list_exercises(<f-args>)

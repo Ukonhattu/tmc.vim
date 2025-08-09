@@ -126,7 +126,7 @@ endfunction
 " ----------------------------------------
 
 function! tmc#ui#pick_organization(cb) abort
-  let l:json = tmc#cli#run(['get-organizations'])
+  let l:json = tmc#cli#get_organizations()
   if empty(l:json)
     call a:cb('')
     return
@@ -163,7 +163,7 @@ function! tmc#ui#pick_course(org, cb) abort
     return
   endif
 
-  let l:json = tmc#cli#run(['get-courses', '--organization', a:org])
+  let l:json = tmc#cli#list_courses(a:org)
   if empty(l:json)
     call a:cb('')
     return
@@ -242,6 +242,7 @@ endfunction
 
 
 
+
 function! tmc#ui#after_pick_course_async(org, course_id) abort
   if empty(a:course_id)
     return
@@ -250,19 +251,27 @@ function! tmc#ui#after_pick_course_async(org, course_id) abort
   echom 'Selected organization: ' . a:org
   echom 'Selected course: ' . a:course_id
 
+  " NEW: remember which course directory we’re targeting right away
+  if exists('g:tmc_course_name') && !empty(g:tmc_course_name)
+    let g:tmc_selected_course_dir = g:tmc_course_name
+  endif
+
   call tmc#download#course_exercises(a:course_id, a:org, {cid ->
         \ (empty(cid)
         \   ? ''
         \   : tmc#ui#after_download_async(a:org, cid))})
 endfunction
 
+
+
 function! tmc#ui#after_download_async(org, course_id) abort
-  sleep 100m
-  if exists('g:tmc_course_name') && !empty(g:tmc_course_name)
+  " No delay; we already know the course dir
+  if exists('g:tmc_selected_course_dir') && !empty(g:tmc_selected_course_dir)
     call tmc#core#cd_course()
   endif
   call tmc#core#list_exercises(a:course_id)
 endfunction
+
 
 function! tmc#ui#pick_organization_command() abort
   call tmc#ui#pick_organization({org ->

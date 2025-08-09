@@ -33,7 +33,7 @@ function! tmc#run_tests#current() abort
   call tmc#spinner#start(l:buf, 'Running tests...')
 
   " Build CLI command
-  let l:cmd = [g:cli_path, 'run-tests', '--exercise-path', l:root]
+  let l:cmd = [g:tmc_cli_path, 'run-tests', '--exercise-path', l:root]
 
   if exists('*jobstart')  " Neovim
     call jobstart(l:cmd, {

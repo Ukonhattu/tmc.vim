@@ -31,7 +31,7 @@ function! tmc#list_exercises(course_id) abort
 endfunction
 
 function! tmc#cd_course() abort
-  return tmc#course#cd()
+  return tmc#core#cd_course()
 endfunction
 
 " Auth
@@ -73,4 +73,8 @@ endfunction
 
 function! tmc#paste_current() abort
   return tmc#paste#current()
+endfunction
+
+function! tmc#projects_dir() abort
+  return tmc#core#projects_dir()
 endfunction

@@ -1,19 +1,24 @@
 
+" autoload/tmc/cli.vim
+" CLI bootstrap, download (with SHA-256 verification), generic exec helpers,
+" settings helpers, and group-aware wrappers for `tmc` and `options`.
+
 if exists('g:loaded_tmc_cli')
   finish
 endif
 let g:loaded_tmc_cli = 1
 
 " ===========================
-" CLI Management
+" Configuration (defaults)
 " ===========================
+let g:tmc_client_name    = get(g:, 'tmc_client_name', 'tmc_vim')
+let g:tmc_client_version = get(g:, 'tmc_client_version', '0.1.0')
+let g:tmc_cli_path       = get(g:, 'tmc_cli_path', '')
+let g:tmc_cli_version    = get(g:, 'tmc_cli_version', '0.38.1')
 
-" Default values
-let g:cli_path = get(g:, 'tmc_cli_path', '')
-let g:client_name = get(g:, 'tmc_client_name', 'tmc_vim')
-let g:client_version = get(g:, 'tmc_client_version', '0.1.0')
-
-" Detect CLI binary storage path
+" ===========================
+" Locate / install tmc-langs-cli
+" ===========================
 function! s:get_storage_dir() abort
   if exists('*stdpath')
     return stdpath('data') . '/tmc'
@@ -30,7 +35,6 @@ function! s:get_binary_path() abort
   return l:dir . '/' . l:exe
 endfunction
 
-" Detect target triple
 function! s:detect_target() abort
   let l:uname_s = substitute(system('uname -s'), '\n', '', 'g')
   let l:uname_m = substitute(system('uname -m'), '\n', '', 'g')
@@ -51,70 +55,76 @@ function! s:detect_target() abort
   return 'x86_64-unknown-linux-gnu'
 endfunction
 
-" Download CLI if missing
-
+" Download helper (tries versioned URL first, then legacy filename form)
 function! s:download_cli(bin_path) abort
-  let l:version = get(g:, 'tmc_cli_version', '0.38.1')
-  let l:target = s:detect_target()
-  let l:fname = 'tmc-langs-cli-' . l:target . '-' . l:version
+  let l:version = g:tmc_cli_version
+  let l:target  = s:detect_target()
+  let l:base_v  = 'https://download.mooc.fi/tmc-langs-rust/' . l:version . '/tmc-langs-cli-' . l:target
+  let l:base_f  = 'https://download.mooc.fi/tmc-langs-rust/tmc-langs-cli-' . l:target . '-' . l:version
   if has('win32') || has('win64')
-    let l:fname .= '.exe'
+    let l:base_v .= '.exe'
+    let l:base_f .= '.exe'
   endif
-  let l:url = 'https://download.mooc.fi/tmc-langs-rust/' . l:fname
 
-  " Create directory
+  " Ensure directory exists
   let l:dir = fnamemodify(a:bin_path, ':h')
   if !isdirectory(l:dir)
     call mkdir(l:dir, 'p')
   endif
 
-  " Download using curl or Powershell fallback
+  " Try candidates in order
+  for l:url in [l:base_v, l:base_f]
+    if s:_download_one(l:url, a:bin_path) == 0
+      " Verify checksum using matching .sha256 next to chosen URL
+      let l:ok = s:_verify_sha256(l:url . '.sha256', a:bin_path)
+      if !l:ok
+        call delete(a:bin_path)
+        call tmc#core#echo_error('tmc-langs-cli checksum verification failed.')
+        return
+      endif
+      " Make it executable on POSIX
+      if !has('win32') && !has('win64')
+        call system('chmod +x ' . shellescape(a:bin_path))
+      endif
+      return
+    endif
+  endfor
+
+  call tmc#core#echo_error('Failed to download tmc-langs-cli from known locations.')
+endfunction
+
+" Download a single URL into dst; returns 0 on success, non-zero on failure
+function! s:_download_one(url, dst) abort
   if executable('curl')
-    let l:cmd = ['curl', '-fL', '-o', a:bin_path, l:url]
-    call system(l:cmd)
+    call system(['curl', '-fL', '-o', a:dst, a:url])
+    return v:shell_error
   elseif has('win32') || has('win64')
     let l:ps = 'powershell -NoProfile -Command "(New-Object Net.WebClient).DownloadFile('''
-          \ . l:url . ''', ''' . a:bin_path . ''')"'
+          \ . a:url . ''', ''' . a:dst . ''')"'
     call system(l:ps)
+    return v:shell_error
   else
-    call tmc#core#echo_error('Cannot download tmc-langs-cli: need curl or PowerShell.')
-    return
-  endif
-
-  if v:shell_error
-    call tmc#core#echo_error('Failed to download tmc-langs-cli')
-    return
-  endif
-
-  " Best-effort checksum verification (won't block if unavailable)
-  call s:verify_sha256(l:url . '.sha256', a:bin_path)
-
-  " Make it executable
-  if !has('win32') && !has('win64')
-    call system('chmod +x ' . shellescape(a:bin_path))
+    return 1
   endif
 endfunction
 
-
-" Verify the downloaded file against remote *.sha256 (best-effort)
-function! s:verify_sha256(sha_url, path) abort
+" Verify downloaded file against a remote *.sha256; returns 1 on match, 0 otherwise
+function! s:_verify_sha256(sha_url, path) abort
   if !executable('curl')
-    return  " skip if we can't fetch the checksum
+    " If we can't fetch checksum at all, treat as failure to be safe.
+    return 0
   endif
-
   let l:tmp = tempname()
   try
     call system(['curl', '-fL', '-o', l:tmp, a:sha_url])
     if v:shell_error || !filereadable(l:tmp)
-      return
+      return 0
     endif
-
     let l:expected = matchstr(join(readfile(l:tmp), "\n"), '\v^[0-9a-f]{64}')
     if empty(l:expected)
-      return
+      return 0
     endif
-
-    " Compute sha256 of the binary
+    " Compute actual sha256
     if exists('*sha256')
       let l:data = join(readfile(a:path, 'b'), '')
       let l:actual = sha256(l:data)
@@ -123,75 +133,176 @@ function! s:verify_sha256(sha_url, path) abort
     elseif executable('shasum')
       let l:actual = matchstr(system(['shasum', '-a', '256', a:path]), '\v^[0-9a-f]{64}')
     else
-      return
+      return 0
     endif
-
-    if tolower(l:actual) != tolower(l:expected)
-      call tmc#core#echo_error('tmc-langs-cli checksum mismatch (download may be corrupted).')
-    endif
+    return tolower(l:actual) == tolower(l:expected)
   finally
-    if filereadable(l:tmp)
-      call delete(l:tmp)
-    endif
+    if filereadable(l:tmp) | call delete(l:tmp) | endif
   endtry
 endfunction
 
-" Ensure CLI is installed
 function! tmc#cli#ensure() abort
-  if !empty(g:cli_path) && filereadable(g:cli_path)
-    return g:cli_path
+  if !empty(g:tmc_cli_path) && filereadable(g:tmc_cli_path)
+    return g:tmc_cli_path
   endif
-
   let l:bin = s:get_binary_path()
   if !filereadable(l:bin)
     call s:download_cli(l:bin)
   endif
-
   if filereadable(l:bin)
-    let g:cli_path = l:bin
+    let g:tmc_cli_path = l:bin
   else
-    let g:cli_path = 'tmc-langs-cli'
+    let g:tmc_cli_path = 'tmc-langs-cli' " fallback to PATH
   endif
-  return g:cli_path
+  return g:tmc_cli_path
 endfunction
 
 " ===========================
-" CLI Runners
+" Generic execution helpers (TMC + any external program)
 " ===========================
-
-" Run CLI synchronously
-function! tmc#cli#run(args) abort
-  call tmc#cli#ensure()
-
-  if type(a:args) != type([]) || empty(a:args)
-    call tmc#core#echo_error('No command provided to run()')
-    return {}
-  endif
-
-  let l:cmd_parts = s:build_command(a:args)
-  let l:cmd = join(l:cmd_parts, ' ')
-  let l:out = system(l:cmd)
+function! tmc#cli#exec_json(args) abort
+  let l:cli = tmc#cli#ensure()
+  let l:cmd = [l:cli] + a:args
+  let l:out = systemlist(l:cmd)
   if v:shell_error
-    call tmc#core#echo_error('tmc-langs-cli failed: ' . l:out)
+    call tmc#core#echo_error('tmc-langs-cli failed: ' . join(l:out, "\n"))
     return {}
   endif
-
   try
-    return json_decode(l:out)
+    return json_decode(join(l:out, "\n"))
   catch
-    call tmc#core#echo_error('Failed to parse CLI output')
+    call tmc#core#echo_error('Failed to parse tmc-langs-cli JSON output')
     return {}
   endtry
 endfunction
 
-" Run CLI streaming (returns list of JSON objects)
+function! tmc#cli#exec_raw(args) abort
+  let l:cli = tmc#cli#ensure()
+  let l:cmd = [l:cli] + a:args
+  let l:out = systemlist(l:cmd)
+  if v:shell_error
+    call tmc#core#echo_error('tmc-langs-cli failed: ' . join(l:out, "\n"))
+    return []
+  endif
+  return l:out
+endfunction
+
+" Run ANY external program in a uniform way.
+" opts: { 'expect_json': v:true/v:false }
+function! tmc#cli#exec_program(prog, args, opts) abort
+  let l:cmd = [a:prog] + a:args
+  let l:out = systemlist(l:cmd)
+  if get(a:opts, 'expect_json', 0)
+    try
+      return {'ok': v:shell_error == 0, 'json': json_decode(join(l:out, "\n")), 'raw': l:out}
+    catch
+      return {'ok': 0, 'json': {}, 'raw': l:out}
+    endtry
+  endif
+  return {'ok': v:shell_error == 0, 'raw': l:out}
+endfunction
+
+" ===========================
+" Settings helpers (JSON)
+" ===========================
+" Example:
+"   tmc#cli#settings_get('projects-dir', 'tmc_vim')
+function! tmc#cli#settings_get(key, client) abort
+  let l:client = empty(a:client) ? g:tmc_client_name : a:client
+  let l:res = tmc#cli#exec_json(['settings', '--client-name', l:client, 'get', a:key])
+  " Expected shape: { data: { "output-data": "<value>" } }
+  if type(l:res) == type({}) && has_key(l:res, 'data')
+    let l:data = l:res['data']
+    if type(l:data) == type({}) && has_key(l:data, 'output-data')
+      let l:val = l:data['output-data']
+      if type(l:val) == type('') && !empty(l:val)
+        return l:val
+      endif
+    endif
+  endif
+  return ''
+endfunction
+
+" Example:
+"   let cfg = tmc#cli#settings_list('tmc_vim')
+"   echo cfg['projects_dir']
+function! tmc#cli#settings_list(client) abort
+  let l:client = empty(a:client) ? g:tmc_client_name : a:client
+  let l:res = tmc#cli#exec_json(['settings', '--client-name', l:client, 'list'])
+  " Expected shape: { data: { "output-data": { ... } } }
+  if type(l:res) == type({}) && has_key(l:res, 'data')
+    let l:data = l:res['data']
+    if type(l:data) == type({}) && has_key(l:data, 'output-data') && type(l:data['output-data']) == type({})
+      return l:data['output-data']
+    endif
+  endif
+  return {}
+endfunction
+
+" ===========================
+" Group-aware wrappers: `tmc` and `options`
+" ===========================
+" NOTE:
+"  - For the `tmc` group, inject --client-name and --client-version
+"    immediately after `tmc`.
+"  - For the `options` group, inject --client-name (but NOT version)
+"    immediately after `options`.
+"  - No --pretty flags here; JSON is parsed as-is.
+
+function! tmc#cli#tmc_json(args) abort
+  let l:pref = ['tmc', '--client-name', g:tmc_client_name, '--client-version', g:tmc_client_version]
+  return tmc#cli#exec_json(l:pref + a:args)
+endfunction
+
+function! tmc#cli#tmc_raw(args) abort
+  let l:pref = ['tmc', '--client-name', g:tmc_client_name, '--client-version', g:tmc_client_version]
+  return tmc#cli#exec_raw(l:pref + a:args)
+endfunction
+
+function! tmc#cli#options_json(args) abort
+  let l:pref = ['options', '--client-name', g:tmc_client_name]
+  return tmc#cli#exec_json(l:pref + a:args)
+endfunction
+
+function! tmc#cli#options_raw(args) abort
+  let l:pref = ['options', '--client-name', g:tmc_client_name]
+  return tmc#cli#exec_raw(l:pref + a:args)
+endfunction
+
+" ===========================
+" Convenience helpers for common `tmc` paths
+" ===========================
+
+" Organizations
+function! tmc#cli#get_organizations() abort
+  " tmc --client-name ... --client-version ... get-organizations
+  return tmc#cli#tmc_json(['get-organizations'])
+endfunction
+
+" Courses for an org
+function! tmc#cli#list_courses(org) abort
+  " tmc ... get-courses --organization <org>
+  return tmc#cli#tmc_json(['get-courses', '--organization', a:org])
+endfunction
+
+" Exercises for a course id
+function! tmc#cli#list_exercises(course_id) abort
+  " tmc ... get-course-exercises --course-id <id>
+  return tmc#cli#tmc_json(['get-course-exercises', '--course-id', a:course_id])
+endfunction
+
+
+" ===========================
+" Back-compat shim(s)
+" ===========================
+function! tmc#cli#run(args) abort
+  " Older code may still call this; keep it working.
+  return tmc#cli#exec_json(a:args)
+endfunction
+
 function! tmc#cli#run_streaming(args) abort
-  call tmc#cli#ensure()
-
-  let l:cmd_parts = s:build_command(a:args)
-  let l:cmd = join(l:cmd_parts, ' ')
-  let l:lines = systemlist(l:cmd)
-
+  " Return list of decoded JSON lines when CLI prints JSONL.
+  let l:lines = tmc#cli#exec_raw(a:args)
   let l:objs = []
   for ln in l:lines
     try
@@ -200,26 +311,5 @@ function! tmc#cli#run_streaming(args) abort
     endtry
   endfor
   return l:objs
-endfunction
-
-" Build CLI command, adding client name/version automatically
-function! s:build_command(args) abort
-  let l:first = a:args[0]
-  let l:top_level = [
-        \ 'run-tests', 'checkstyle', 'clean', 'compress-project',
-        \ 'extract-project', 'fast-available-points', 'find-exercises',
-        \ 'get-exercise-packaging-configuration',
-        \ 'list-local-tmc-course-exercises', 'prepare-solution',
-        \ 'prepare-stub', 'prepare-submission', 'refresh-course', 'settings',
-        \ 'scan-exercise', 'help'
-        \ ]
-
-  if index(l:top_level, l:first) >= 0
-    return [g:cli_path] + a:args
-  elseif l:first ==# 'tmc'
-    return [g:cli_path, l:first, '--client-name', g:client_name, '--client-version', g:client_version] + a:args[1:]
-  else
-    return [g:cli_path, 'tmc', '--client-name', g:client_name, '--client-version', g:client_version] + a:args
-  endif
 endfunction
 
