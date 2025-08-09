@@ -42,8 +42,8 @@ function! tmc#download#course_exercises(course_id, org, cb) abort
 
   " Build CLI command
   let l:args = [l:cli, 'tmc',
-        \ '--client-name', g:client_name,
-        \ '--client-version', g:client_version,
+        \ '--client-name', g:tmc_client_name,
+        \ '--client-version', g:tmc_client_version,
         \ 'download-or-update-course-exercises']
   for id in l:exercise_ids
     call extend(l:args, ['--exercise-id', id])

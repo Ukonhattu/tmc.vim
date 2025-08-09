@@ -39,9 +39,9 @@ function! tmc#submit#current() abort
   " Spinner
   call tmc#spinner#start(g:tmc_submit_buf, 'Submitting exercise...')
 
-  let l:cmd = [g:cli_path, 'tmc',
-        \ '--client-name', g:client_name,
-        \ '--client-version', g:client_version,
+  let l:cmd = [g:tmc_cli_path, 'tmc',
+        \ '--client-name', g:tmc_client_name,
+        \ '--client-version', g:tmc_client_version,
         \ 'submit',
         \ '--exercise-id', l:id,
         \ '--submission-path', l:root]

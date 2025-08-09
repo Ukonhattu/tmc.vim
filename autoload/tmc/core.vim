@@ -23,38 +23,62 @@ endfunction
 
 
 function! tmc#core#cd_course() abort
-  " Ensure course name and organization exist
-  if !exists('g:tmc_course_name') || empty(g:tmc_course_name)
-    echohl ErrorMsg | echom 'No course selected; pick a course first' | echohl None
-    return
-  endif
-  if !exists('g:tmc_organization') || empty(g:tmc_organization)
-    echohl ErrorMsg | echom 'No organisation selected; pick an organisation first' | echohl None
+  let l:root = tmc#core#projects_dir()
+  if empty(l:root)
     return
   endif
 
-
-  " Clean up course name: trim spaces and surrounding quotes
-  let l:course_dirname = substitute(g:tmc_course_name, '^\s*["'']\?\|\(["'']\?\s*$\)', '', 'g')
-
-
-
-  " Determine base directory
-  if exists('$TMC_LANGS_DEFAULT_PROJECTS_DIR') && !empty($TMC_LANGS_DEFAULT_PROJECTS_DIR)
-    let l:base = $TMC_LANGS_DEFAULT_PROJECTS_DIR . '/tmc_vim'
-  elseif has('win32') || has('win64')
-    let l:base = $LOCALAPPDATA . '/tmc/tmc_vim'
+  " If you track current course dir globally, prefer it.
+  if exists('g:tmc_selected_course_dir') && !empty(g:tmc_selected_course_dir)
+    let l:target = fnamemodify(l:root . '/' . g:tmc_selected_course_dir, ':p')
   else
-    let l:base = expand('~/.local/share/tmc/tmc_vim')
+    " Derive from current buffer: find nearest course_config.toml and cd to its dir
+    let l:cfg = findfile('course_config.toml', expand('%:p:h') . ';')
+    if empty(l:cfg)
+      call tmc#core#echo_error('Not inside a course; open a file within a downloaded exercise first.')
+      return
+    endif
+    let l:target = fnamemodify(fnamemodify(l:cfg, ':h'), ':p')
   endif
 
-  let l:path = l:base . '/' . l:course_dirname
-
-  " Change directory
-  execute 'cd' fnameescape(l:path)
-  echom 'Changed directory to ' . l:path
+  try
+    execute 'cd' fnameescape(l:target)
+    call tmc#core#echo_info('cd ' . l:target)
+  catch
+    call tmc#core#echo_error('Failed to cd into ' . l:target)
+  endtry
 endfunction
 
+function! tmc#core#projects_dir() abort
+  if exists('$TMC_LANGS_DEFAULT_PROJECTS_DIR') && !empty($TMC_LANGS_DEFAULT_PROJECTS_DIR)
+    return fnamemodify(expand($TMC_LANGS_DEFAULT_PROJECTS_DIR), ':p')
+  endif
+
+  try
+    let l:client = get(g:, 'tmc_client_name', 'tmc_vim')
+    let l:val = tmc#cli#settings_get('projects-dir', l:client)
+    if empty(l:val)
+      " Some builds might use underscore – try list() as fallback
+      let l:cfg = tmc#cli#settings_list(l:client)
+      if has_key(l:cfg, 'projects_dir')
+        let l:val = l:cfg['projects_dir']
+      elseif has_key(l:cfg, 'projects-dir')
+        let l:val = l:cfg['projects-dir']
+      endif
+    endif
+    if !empty(l:val)
+      return fnamemodify(expand(l:val), ':p')
+    endif
+  catch
+  endtry
+
+  call tmc#core#echo_error(
+        \ 'Could not determine TMC projects directory. '
+        \ . 'Set $TMC_LANGS_DEFAULT_PROJECTS_DIR or run: '
+        \ . '!tmc-langs-cli settings move-projects-dir --client-name '
+        \ . get(g:, 'tmc_client_name', 'tmc_vim') . ' <path>')
+  return ''
+endfunction
 
 " Find the root directory of the current exercise by locating .tmcproject.yml
 function! tmc#core#find_exercise_root() abort
@@ -114,7 +138,7 @@ endfunction
 " Lists all courses for the current organization
 function! tmc#core#list_courses() abort
   let l:org = get(g:, 'tmc_organization', 'mooc')
-  let l:json = tmc#cli#run(['get-courses', '--organization', l:org])
+  let l:json = tmc#cli#list_courses(a:org)
   if empty(l:json)
     return
   endif
@@ -141,7 +165,7 @@ function! tmc#core#list_exercises(course_id) abort
     call tmc#core#echo_error('Usage: :TmcExercises <course-id>')
     return
   endif
-  let l:json = tmc#cli#run(['get-course-exercises', '--course-id', a:course_id])
+  let l:json = tmc#cli#list_exercises(a:course_id)
   if empty(l:json)
     return
   endif
@@ -164,7 +188,7 @@ endfunction
 
 " Collects all exercise IDs for a course
 function! tmc#core#get_exercise_ids(course_id) abort
-  let l:json = tmc#cli#run(['get-course-exercises', '--course-id', a:course_id])
+  let l:json = tmc#cli#list_exercises(a:course_id)
   let l:ids = []
   if !empty(l:json) && has_key(l:json, 'data')
     let l:data = l:json['data']
