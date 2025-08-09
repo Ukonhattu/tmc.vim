@@ -138,7 +138,7 @@ endfunction
 " Lists all courses for the current organization
 function! tmc#core#list_courses() abort
   let l:org = get(g:, 'tmc_organization', 'mooc')
-  let l:json = tmc#cli#list_courses(a:org)
+  let l:json = tmc#cli#list_courses(l:org)
   if empty(l:json)
     return
   endif
