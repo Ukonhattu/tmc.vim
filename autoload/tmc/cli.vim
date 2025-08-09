@@ -52,6 +52,7 @@ function! s:detect_target() abort
 endfunction
 
 " Download CLI if missing
+
 function! s:download_cli(bin_path) abort
   let l:version = get(g:, 'tmc_cli_version', '0.38.1')
   let l:target = s:detect_target()
@@ -67,17 +68,72 @@ function! s:download_cli(bin_path) abort
     call mkdir(l:dir, 'p')
   endif
 
-  let l:cmd = 'curl -L -f -o ' . shellescape(a:bin_path) . ' ' . shellescape(l:url)
-  let l:out = system(l:cmd)
-  if v:shell_error
-    call tmc#core#echo_error('Failed to download tmc-langs-cli: ' . l:out)
+  " Download using curl or Powershell fallback
+  if executable('curl')
+    let l:cmd = ['curl', '-fL', '-o', a:bin_path, l:url]
+    call system(l:cmd)
+  elseif has('win32') || has('win64')
+    let l:ps = 'powershell -NoProfile -Command "(New-Object Net.WebClient).DownloadFile('''
+          \ . l:url . ''', ''' . a:bin_path . ''')"'
+    call system(l:ps)
+  else
+    call tmc#core#echo_error('Cannot download tmc-langs-cli: need curl or PowerShell.')
     return
   endif
+
+  if v:shell_error
+    call tmc#core#echo_error('Failed to download tmc-langs-cli')
+    return
+  endif
+
+  " Best-effort checksum verification (won't block if unavailable)
+  call s:verify_sha256(l:url . '.sha256', a:bin_path)
 
   " Make it executable
   if !has('win32') && !has('win64')
     call system('chmod +x ' . shellescape(a:bin_path))
   endif
+endfunction
+
+
+" Verify the downloaded file against remote *.sha256 (best-effort)
+function! s:verify_sha256(sha_url, path) abort
+  if !executable('curl')
+    return  " skip if we can't fetch the checksum
+  endif
+
+  let l:tmp = tempname()
+  try
+    call system(['curl', '-fL', '-o', l:tmp, a:sha_url])
+    if v:shell_error || !filereadable(l:tmp)
+      return
+    endif
+
+    let l:expected = matchstr(join(readfile(l:tmp), "\n"), '\v^[0-9a-f]{64}')
+    if empty(l:expected)
+      return
+    endif
+
+    " Compute sha256 of the binary
+    if exists('*sha256')
+      let l:data = join(readfile(a:path, 'b'), '')
+      let l:actual = sha256(l:data)
+    elseif executable('sha256sum')
+      let l:actual = matchstr(system(['sha256sum', a:path]), '\v^[0-9a-f]{64}')
+    elseif executable('shasum')
+      let l:actual = matchstr(system(['shasum', '-a', '256', a:path]), '\v^[0-9a-f]{64}')
+    else
+      return
+    endif
+
+    if tolower(l:actual) != tolower(l:expected)
+      call tmc#core#echo_error('tmc-langs-cli checksum mismatch (download may be corrupted).')
+    endif
+  finally
+    if filereadable(l:tmp)
+      call delete(l:tmp)
+    endif
+  endtry
 endfunction
 
 " Ensure CLI is installed
