@@ -107,22 +107,19 @@ endfunction
 
 " Reads course_config.toml to find exercise ID
 " - Supports [exercises.slug], [exercises."slug"], [exercises.'slug']
-" - Accepts id = 123, id = "123", id = '123' (with spaces)
+" - Accepts id = 123, id = "123", id = '123' (with spaces, trailing comments ok)
 function! tmc#core#get_exercise_id(root) abort
   let l:slug = fnamemodify(a:root, ':t')
 
-  " Escape slug for regex safety
-  let l:slug_re = escape(l:slug, '\.^$*~[]')
+  " Prebuild the three possible headers
+  let l:sec1 = '[exercises.' . l:slug . ']'
+  let l:sec2 = '[exercises."' . l:slug . '"]'
+  let l:sec3 = "[exercises.'" . l:slug . "']"
 
-  " Match headers:
-  "   [exercises.slug]
-  "   [exercises."slug"]
-  "   [exercises.'slug']
-  let l:section_pat = '^\s*\[exercises\.\('
-        \ . '"' . l:slug_re . '"\|'   " double-quoted key
-        \ . "'" . l:slug_re . "'\|"  " single-quoted key
-        \ . l:slug_re                " unquoted key
-        \ . '\)\]\s*$'
+  " Prebuild safe regexes for those headers (allow leading/trailing whitespace)
+  let l:hdr1 = '^\s*' . escape(l:sec1, '\.^$*~[]') . '\s*$'
+  let l:hdr2 = '^\s*' . escape(l:sec2, '\.^$*~[]') . '\s*$'
+  let l:hdr3 = '^\s*' . escape(l:sec3, '\.^$*~[]') . '\s*$'
 
   let l:dir = a:root
   while 1
@@ -130,11 +127,11 @@ function! tmc#core#get_exercise_id(root) abort
     if filereadable(l:toml_file)
       let l:lines = readfile(l:toml_file)
       for l:idx in range(len(l:lines))
-        if l:lines[l:idx] =~# l:section_pat
+        if l:lines[l:idx] =~# l:hdr1 || l:lines[l:idx] =~# l:hdr2 || l:lines[l:idx] =~# l:hdr3
           let l:i = l:idx + 1
           " scan until next [section]
           while l:i < len(l:lines) && l:lines[l:i] !~# '^\s*\['
-            " Accept: id = 123 | id = "123" | id = '123' (with any spaces)
+            " Accept: id = 123 | id = "123" | id = '123' (any spaces, allow trailing comments)
             if l:lines[l:i] =~# '\v^\s*id\s*=\s*[''"]?\s*\d+'
               return matchstr(l:lines[l:i], '\v\zs\d+\ze')
             endif
