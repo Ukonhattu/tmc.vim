@@ -14,7 +14,7 @@ function! tmc#submit#current() abort
 
   let l:root = tmc#core#find_exercise_root()
   if empty(l:root)
-    call tmc#core#error('Could not locate exercise root (.tmcproject.yml not found)')
+    call tmc#core#echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
 
@@ -22,7 +22,7 @@ function! tmc#submit#current() abort
   if empty(l:id)
     let l:id = input('Exercise ID: ')
     if empty(l:id)
-      call tmc#core#error('Submission cancelled: no exercise ID provided')
+      call tmc#core#echo_error('Submission cancelled: no exercise ID provided')
       return
     endif
   endif
