@@ -107,19 +107,14 @@ endfunction
 
 " Reads course_config.toml to find exercise ID
 " - Supports [exercises.slug], [exercises."slug"], [exercises.'slug']
-" - Accepts id = 123, id = "123", id = '123' (with spaces, trailing comments ok)
+" - Accepts id = 123, id = "123", id = '123', with any spaces/comments
 function! tmc#core#get_exercise_id(root) abort
   let l:slug = fnamemodify(a:root, ':t')
 
-  " Prebuild the three possible headers
-  let l:sec1 = '[exercises.' . l:slug . ']'
-  let l:sec2 = '[exercises."' . l:slug . '"]'
-  let l:sec3 = "[exercises.'" . l:slug . "']"
-
-  " Prebuild safe regexes for those headers (allow leading/trailing whitespace)
-  let l:hdr1 = '^\s*' . escape(l:sec1, '\.^$*~[]') . '\s*$'
-  let l:hdr2 = '^\s*' . escape(l:sec2, '\.^$*~[]') . '\s*$'
-  let l:hdr3 = '^\s*' . escape(l:sec3, '\.^$*~[]') . '\s*$'
+  " Build exact headers and escape for regex (allow leading/trailing ws)
+  let l:sec1 = '^\s*' . escape('[exercises.' . l:slug . ']', '\.^$*~[]') . '\s*$'
+  let l:sec2 = '^\s*' . escape('[exercises."' . l:slug . '"]', '\.^$*~[]') . '\s*$'
+  let l:sec3 = '^\s*' . escape("[exercises.'" . l:slug . "']", '\.^$*~[]') . '\s*$'
 
   let l:dir = a:root
   while 1
@@ -127,13 +122,16 @@ function! tmc#core#get_exercise_id(root) abort
     if filereadable(l:toml_file)
       let l:lines = readfile(l:toml_file)
       for l:idx in range(len(l:lines))
-        if l:lines[l:idx] =~# l:hdr1 || l:lines[l:idx] =~# l:hdr2 || l:lines[l:idx] =~# l:hdr3
+        if l:lines[l:idx] =~# l:sec1 || l:lines[l:idx] =~# l:sec2 || l:lines[l:idx] =~# l:sec3
           let l:i = l:idx + 1
           " scan until next [section]
           while l:i < len(l:lines) && l:lines[l:i] !~# '^\s*\['
-            " Accept: id = 123 | id = "123" | id = '123' (any spaces, allow trailing comments)
-            if l:lines[l:i] =~# '\v^\s*id\s*=\s*[''"]?\s*\d+'
-              return matchstr(l:lines[l:i], '\v\zs\d+\ze')
+            " Simple: find 'id =' then extract first number on the line
+            if l:lines[l:i] =~# '^\s*id\s*='
+              let l:num = matchstr(l:lines[l:i], '\d\+')
+              if !empty(l:num)
+                return l:num
+              endif
             endif
             let l:i += 1
           endwhile
@@ -142,9 +140,7 @@ function! tmc#core#get_exercise_id(root) abort
       break
     endif
     let l:parent = fnamemodify(l:dir, ':h')
-    if l:parent ==# l:dir
-      break
-    endif
+    if l:parent ==# l:dir | break | endif
     let l:dir = l:parent
   endwhile
   return ''
