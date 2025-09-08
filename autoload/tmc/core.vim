@@ -100,21 +100,43 @@ function! tmc#core#find_exercise_root() abort
   return ''
 endfunction
 
+" ===========================
+" Course/Exercise Listing
+" ===========================
+
+
 " Reads course_config.toml to find exercise ID
+" - Supports [exercises.slug], [exercises."slug"], [exercises.'slug']
+" - Accepts id = 123, id = "123", id = '123' (with spaces)
 function! tmc#core#get_exercise_id(root) abort
   let l:slug = fnamemodify(a:root, ':t')
+
+  " Escape slug for regex safety
+  let l:slug_re = escape(l:slug, '\.^$*~[]')
+
+  " Match headers:
+  "   [exercises.slug]
+  "   [exercises."slug"]
+  "   [exercises.'slug']
+  let l:section_pat = '^\s*\[exercises\.\('
+        \ . '"' . l:slug_re . '"\|'   " double-quoted key
+        \ . "'" . l:slug_re . "'\|"  " single-quoted key
+        \ . l:slug_re                " unquoted key
+        \ . '\)\]\s*$'
+
   let l:dir = a:root
   while 1
     let l:toml_file = l:dir . '/course_config.toml'
     if filereadable(l:toml_file)
       let l:lines = readfile(l:toml_file)
-      let l:section = '[exercises.' . l:slug . ']'
       for l:idx in range(len(l:lines))
-        if l:lines[l:idx] =~# '^\s*' . escape(l:section, '[]') . '\s*$'
+        if l:lines[l:idx] =~# l:section_pat
           let l:i = l:idx + 1
+          " scan until next [section]
           while l:i < len(l:lines) && l:lines[l:i] !~# '^\s*\['
-            if l:lines[l:i] =~# '^\s*id\s*=\s*\d\+'
-              return matchstr(l:lines[l:i], '\d\+')
+            " Accept: id = 123 | id = "123" | id = '123' (with any spaces)
+            if l:lines[l:i] =~# '\v^\s*id\s*=\s*[''"]?\s*\d+'
+              return matchstr(l:lines[l:i], '\v\zs\d+\ze')
             endif
             let l:i += 1
           endwhile
@@ -130,10 +152,6 @@ function! tmc#core#get_exercise_id(root) abort
   endwhile
   return ''
 endfunction
-
-" ===========================
-" Course/Exercise Listing
-" ===========================
 
 " Lists all courses for the current organization
 function! tmc#core#list_courses() abort
