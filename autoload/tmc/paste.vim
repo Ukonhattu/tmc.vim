@@ -9,17 +9,17 @@ let g:tmc_paste_buf = -1
 function! tmc#paste#current() abort
   call tmc#cli#ensure()
 
-  let l:root = tmc#core#find_exercise_root()
+  let l:root = tmc#project#find_exercise_root()
   if empty(l:root)
-    call tmc#core#error('Could not locate exercise root (.tmcproject.yml not found)')
+    call tmc#util#echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
 
-  let l:id = tmc#core#get_exercise_id(l:root)
+  let l:id = tmc#project#get_exercise_id(l:root)
   if empty(l:id)
     let l:id = input('Exercise ID: ')
     if empty(l:id)
-      call tmc#core#error('Paste cancelled: no exercise ID provided')
+      call tmc#util#echo_error('Paste cancelled: no exercise ID provided')
       return
     endif
   endif
@@ -36,9 +36,9 @@ function! tmc#paste#current() abort
   " Spinner
   call tmc#spinner#start(g:tmc_paste_buf, 'Creating paste...')
 
-  let l:cmd = [g:cli_path, 'tmc',
-        \ '--client-name', g:client_name,
-        \ '--client-version', g:client_version,
+  let l:cmd = [g:tmc_cli_path, 'tmc',
+        \ '--client-name', g:tmc_client_name,
+        \ '--client-version', g:tmc_client_version,
         \ 'paste',
         \ '--exercise-id', l:id,
         \ '--submission-path', l:root]

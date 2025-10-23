@@ -18,12 +18,12 @@ let s:last_result = {}
 function! tmc#download#course_exercises(course_id, org, cb) abort
   let l:cli = tmc#cli#ensure()
   if empty(a:course_id)
-    call tmc#ui#error('No course ID provided')
+    call tmc#util#echo_error('No course ID provided')
     call a:cb('')
     return
   endif
 
-  let l:exercise_ids = tmc#core#get_exercise_ids(a:course_id)
+  let l:exercise_ids = tmc#exercise#get_ids(a:course_id)
   if empty(l:exercise_ids)
     echom 'No exercises to download for course ' . a:course_id
     call a:cb('')

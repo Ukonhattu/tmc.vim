@@ -1,0 +1,34 @@
+" test/unit/test_util.vader
+" Tests for autoload/tmc/util.vim
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (tmc#util#echo_error should display error message):
+  redir => output
+  call tmc#util#echo_error('Test error')
+  redir END
+  Assert match(output, 'Test error') >= 0
+
+Execute (tmc#util#echo_info should display info message):
+  redir => output
+  call tmc#util#echo_info('Test info')
+  redir END
+  Assert match(output, 'Test info') >= 0
+
+Execute (tmc#util#echo_success should display success message):
+  redir => output
+  call tmc#util#echo_success('Test success')
+  redir END
+  Assert match(output, 'Test success') >= 0
+
+Execute (tmc#util#echo_warning should display warning message):
+  redir => output
+  call tmc#util#echo_warning('Test warning')
+  redir END
+  Assert match(output, 'Test warning') >= 0
+

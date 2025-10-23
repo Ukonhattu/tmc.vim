@@ -1,0 +1,74 @@
+" test/unit/test_project.vader
+" Tests for autoload/tmc/project.vim
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (tmc#project#get_dir should return projects directory from env):
+  let $TMC_LANGS_DEFAULT_PROJECTS_DIR = '/tmp/tmc-test'
+  let result = tmc#project#get_dir()
+  Assert match(result, '/tmp/tmc-test') >= 0
+
+Execute (tmc#project#find_exercise_root should find .tmcproject.yml):
+  let temp_dir = test#create_temp_dir()
+  let exercise_dir = temp_dir . '/exercise1'
+  call test#create_mock_exercise_root(exercise_dir)
+  
+  " Create a test file inside the exercise
+  let test_file = exercise_dir . '/src/main.py'
+  call mkdir(exercise_dir . '/src', 'p')
+  call writefile(['print("hello")'], test_file)
+  
+  " Open the file and find exercise root
+  execute 'edit' test_file
+  let root = tmc#project#find_exercise_root()
+  
+  Assert root == exercise_dir, 'Should find exercise root'
+  
+  " Clean up
+  execute 'bwipeout!'
+  call delete(temp_dir, 'rf')
+
+Execute (tmc#project#get_exercise_id should parse course_config.toml):
+  let temp_dir = test#create_temp_dir()
+  let course_dir = temp_dir . '/course'
+  let exercise_dir = course_dir . '/part01-exercise1'
+  
+  call mkdir(exercise_dir, 'p')
+  call test#create_mock_course_config(course_dir, 'part01-exercise1', '12345')
+  
+  let exercise_id = tmc#project#get_exercise_id(exercise_dir)
+  
+  AssertEqual '12345', exercise_id, 'Should parse exercise ID correctly'
+  
+  " Clean up
+  call delete(temp_dir, 'rf')
+
+Execute (tmc#project#get_exercise_id should handle quoted slugs):
+  let temp_dir = test#create_temp_dir()
+  let course_dir = temp_dir . '/course'
+  let exercise_dir = course_dir . '/part01-exercise1'
+  
+  call mkdir(exercise_dir, 'p')
+  
+  " Create config with double-quoted slug
+  let config = [
+        \ '[course]',
+        \ 'name = "Test Course"',
+        \ '',
+        \ '[exercises."part01-exercise1"]',
+        \ 'id = 67890'
+        \ ]
+  call writefile(config, course_dir . '/course_config.toml')
+  
+  let exercise_id = tmc#project#get_exercise_id(exercise_dir)
+  
+  AssertEqual '67890', exercise_id, 'Should parse exercise ID with quoted slug'
+  
+  " Clean up
+  call delete(temp_dir, 'rf')
+

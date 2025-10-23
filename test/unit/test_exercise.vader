@@ -1,0 +1,70 @@
+" test/unit/test_exercise.vader
+" Tests for autoload/tmc/exercise.vim
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (tmc#exercise#get_list should parse exercise data):
+  " Mock the CLI response
+  function! tmc#cli#list_exercises(course_id) abort
+    return test#mock_exercises_response()
+  endfunction
+  
+  let exercises = tmc#exercise#get_list('1')
+  
+  AssertEqual 2, len(exercises), 'Should return 2 exercises'
+  AssertEqual 101, exercises[0]['id'], 'First exercise should have ID 101'
+  AssertEqual 'exercise-1', exercises[0]['name'], 'First exercise should have correct name'
+  
+  " Clean up
+  delfunction tmc#cli#list_exercises
+
+Execute (tmc#exercise#get_ids should extract exercise IDs):
+  function! tmc#cli#list_exercises(course_id) abort
+    return test#mock_exercises_response()
+  endfunction
+  
+  let ids = tmc#exercise#get_ids('1')
+  
+  AssertEqual 2, len(ids), 'Should return 2 IDs'
+  AssertEqual '101', ids[0], 'First ID should be "101"'
+  AssertEqual '102', ids[1], 'Second ID should be "102"'
+  
+  " Clean up
+  delfunction tmc#cli#list_exercises
+
+Execute (tmc#exercise#get_ids should handle empty response):
+  function! tmc#cli#list_exercises(course_id) abort
+    return {}
+  endfunction
+  
+  let ids = tmc#exercise#get_ids('1')
+  
+  AssertEqual 0, len(ids), 'Should return empty list for empty response'
+  
+  " Clean up
+  delfunction tmc#cli#list_exercises
+
+Execute (tmc#exercise#get_list should handle legacy format):
+  function! tmc#cli#list_exercises(course_id) abort
+    return {
+          \ 'data': {
+          \   'exercises': [
+          \     {'id': 201, 'name': 'legacy-exercise'}
+          \   ]
+          \ }
+          \ }
+  endfunction
+  
+  let exercises = tmc#exercise#get_list('1')
+  
+  AssertEqual 1, len(exercises), 'Should return 1 exercise from legacy format'
+  AssertEqual 'legacy-exercise', exercises[0]['name'], 'Should parse legacy format correctly'
+  
+  " Clean up
+  delfunction tmc#cli#list_exercises
+

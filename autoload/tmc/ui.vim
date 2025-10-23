@@ -14,9 +14,7 @@ let g:autoloaded_tmc_ui = 1
 " ----------------------------------------
 
 function! tmc#ui#error(msg) abort
-  echohl ErrorMsg
-  echom a:msg
-  echohl None
+  return tmc#util#echo_error(a:msg)
 endfunction
 
 " ----------------------------------------
@@ -267,9 +265,9 @@ endfunction
 function! tmc#ui#after_download_async(org, course_id) abort
   " No delay; we already know the course dir
   if exists('g:tmc_selected_course_dir') && !empty(g:tmc_selected_course_dir)
-    call tmc#core#cd_course()
+    call tmc#project#cd_course()
   endif
-  call tmc#core#list_exercises(a:course_id)
+  call tmc#exercise#list(a:course_id)
 endfunction
 
 

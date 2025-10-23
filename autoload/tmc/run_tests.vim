@@ -13,9 +13,9 @@ let s:logs = []
 function! tmc#run_tests#current() abort
   call tmc#cli#ensure()
 
-  let l:root = tmc#core#find_exercise_root()
+  let l:root = tmc#project#find_exercise_root()
   if empty(l:root)
-    call tmc#core#error('Could not locate exercise root (.tmcproject.yml not found)')
+    call tmc#util#echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
 

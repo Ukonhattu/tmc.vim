@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.vim }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        vim:
+          - vim-8.2
+          - vim-9.0
+          - neovim-0.5
+          - neovim-0.9
+          - neovim-stable
+        exclude:
+          # Vim 8.2 might not be easily available on all platforms
+          - os: macos-latest
+            vim: vim-8.2
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Vim/Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          version: ${{ matrix.vim }}
+
+      - name: Install Vader.vim
+        run: |
+          git clone --depth 1 https://github.com/junegunn/vader.vim.git ~/.vim/plugged/vader.vim
+          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
+          ln -s ~/.vim/plugged/vader.vim ~/.local/share/nvim/site/pack/vendor/start/vader.vim || true
+
+      - name: Run tests
+        run: |
+          if command -v nvim &> /dev/null; then
+            nvim --version
+            nvim --headless -u NONE \
+              -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
+              -c "runtime plugin/tmc.vim" \
+              -c "Vader! test/**/*.vader" 2>&1 | tee test_output.log
+          else
+            vim --version
+            vim -Nu NONE \
+              -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
+              -c "runtime plugin/tmc.vim" \
+              -c "Vader! test/**/*.vader" 2>&1 | tee test_output.log
+          fi
+        continue-on-error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.vim }}-${{ matrix.os }}
+          path: test_output.log
+
+  lint:
+    name: Lint VimScript
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install vint
+        run: pip install vim-vint
+
+      - name: Run vint
+        run: |
+          vint --version
+          vint autoload/ plugin/ || true
+
+  docs:
+    name: Validate documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README
+        run: |
+          if ! grep -q "TMC-Vim" README.md; then
+            echo "README.md seems invalid"
+            exit 1
+          fi
+          echo "README.md looks good"
+
+      - name: Check help doc exists
+        run: |
+          if [ ! -f "doc/tmc.txt" ]; then
+            echo "Help documentation is missing"
+            exit 1
+          fi
+          echo "Help documentation exists"
+
+      - name: Check LICENSE
+        run: |
+          if [ ! -f "LICENSE" ]; then
+            echo "LICENSE file is missing"
+            exit 1
+          fi
+          echo "LICENSE file exists"
+

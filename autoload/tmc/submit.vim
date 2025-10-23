@@ -12,17 +12,17 @@ let g:tmc_submit_buf = -1
 function! tmc#submit#current() abort
   call tmc#cli#ensure()
 
-  let l:root = tmc#core#find_exercise_root()
+  let l:root = tmc#project#find_exercise_root()
   if empty(l:root)
-    call tmc#core#echo_error('Could not locate exercise root (.tmcproject.yml not found)')
+    call tmc#util#echo_error('Could not locate exercise root (.tmcproject.yml not found)')
     return
   endif
 
-  let l:id = tmc#core#get_exercise_id(l:root)
+  let l:id = tmc#project#get_exercise_id(l:root)
   if empty(l:id)
     let l:id = input('Exercise ID: ')
     if empty(l:id)
-      call tmc#core#echo_error('Submission cancelled: no exercise ID provided')
+      call tmc#util#echo_error('Submission cancelled: no exercise ID provided')
       return
     endif
   endif

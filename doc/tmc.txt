@@ -4,46 +4,349 @@
 =============================================================================
 INTRODUCTION                                           *tmc* *tmc-overview*
 
-  tmc.vim integrates the |tmc-langs-cli| with Vim/Neovim. It helps you log in,
+  tmc.vim integrates the tmc-langs-cli with Vim/Neovim. It helps you log in,
   list courses and exercises, download templates, run tests, and submit.
+
+  This plugin provides a complete workflow for working with TMC exercises:
+  - Authentication with TMC server
+  - Organization and course selection
+  - Exercise download and management
+  - Local test execution
+  - Exercise submission and feedback
+
+  The plugin works with both Vim 8.2+ and Neovim 0.5+, and supports
+  multiple UI backends including Telescope (Neovim), fzf.vim, and
+  native vim popups.
+
+=============================================================================
+CONTENTS                                                   *tmc-contents*
+
+  1. Introduction...................|tmc-overview|
+  2. Installation...................|tmc-installation|
+  3. Quick Start....................|tmc-quickstart|
+  4. Commands.......................|tmc-commands|
+  5. Settings.......................|tmc-settings|
+  6. Mappings.......................|tmc-mappings|
+  7. Workflow.......................|tmc-workflow|
+  8. Troubleshooting................|tmc-troubleshooting|
+  9. Module Structure...............|tmc-modules|
+  10. API...........................|tmc-api|
+  11. License.......................|tmc-license|
+
+=============================================================================
+INSTALLATION                                           *tmc-installation*
+
+Using vim-plug: >
+  Plug 'ukonhattu/tmc.vim'
+<
+
+Using Lazy.nvim: >
+  { 'ukonhattu/tmc.vim' }
+<
+
+Manual installation:
+  Copy the plugin directory to ~/.vim/pack/tmc/start/
+
+The plugin will automatically download tmc-langs-cli on first use.
+To specify a custom binary, set |g:tmc_cli_path| in your vimrc.
+
+=============================================================================
+QUICK START                                              *tmc-quickstart*
+
+1. Login to TMC: >
+  :TmcLogin your-email@example.com
+<
+
+2. Pick a course (downloads exercises automatically): >
+  :TmcPickCourse
+<
+
+3. Navigate to an exercise and run tests: >
+  :TmcRunTests
+  " or use mapping:
+  <leader>tt
+<
+
+4. Submit your solution: >
+  :TmcSubmit
+  " or use mapping:
+  <leader>ts
+<
 
 =============================================================================
 COMMANDS                                                    *tmc-commands*
 
-  :TmcLogin [email]           Log in to TMC.
-  :TmcCourses                 List courses for current org (see g:tmc_organization).
-  :TmcExercises <courseId>    List exercises for a course.
-  :TmcDownload <exerciseId>…  Download/update one or more exercises.
-  :TmcRunTests                Run tests for the current exercise.
-  :TmcSubmit                  Submit the current exercise.
-  :TmcPickOrg                 Pick an organization interactively.
-  :TmcPickCourse              Pick a course and download its exercises.
-  :TmcCdCourse                cd to the selected course directory.
+Authentication ~
+  :TmcLogin [email]                                           *:TmcLogin*
+      Log in to TMC. If email is omitted, you'll be prompted.
+      Password is always prompted securely.
+      
+      Example: >
+        :TmcLogin student@example.com
+<
+
+  :TmcLogout                                                 *:TmcLogout*
+      Log out from TMC server.
+
+  :TmcStatus                                                 *:TmcStatus*
+      Check if you're currently logged in.
+
+Organization & Course Selection ~
+  :TmcPickOrg                                                *:TmcPickOrg*
+  :TmcPickOrganization                             *:TmcPickOrganization*
+      Opens an interactive menu to select an organization.
+      Sets |g:tmc_organization| for subsequent commands.
+
+  :TmcCourses                                                *:TmcCourses*
+  :TmcListCourses                                        *:TmcListCourses*
+      Lists all available courses in the current organization.
+      Use :TmcPickOrg to change organization.
+
+  :TmcPickCourse                                          *:TmcPickCourse*
+      Interactive course picker. Downloads all exercises for the
+      selected course and changes to the course directory.
+
+  :TmcExercises <courseId>                               *:TmcExercises*
+  :TmcListExercises <courseId>                       *:TmcListExercises*
+      Lists all exercises for the specified course.
+      
+      Example: >
+        :TmcExercises 123
+<
+
+  :TmcCdCourse                                            *:TmcCdCourse*
+      Change Vim's working directory to the last selected course.
+
+Exercise Management ~
+  :TmcDownload <exerciseId> [<exerciseId> ...]           *:TmcDownload*
+      Downloads or updates one or more exercises.
+      The student file policy prevents overwriting your work.
+      
+      Example: >
+        :TmcDownload 101 102 103
+<
+
+  :TmcRunTests                                            *:TmcRunTests*
+      Runs tests for the exercise containing the current buffer.
+      Opens a scratch buffer showing test results with syntax highlighting.
+      Automatically detects the exercise root by finding .tmcproject.yml
+
+  :TmcSubmit                                                *:TmcSubmit*
+  :TmcSubmitCurrent                                  *:TmcSubmitCurrent*
+      Submits the exercise containing the current buffer.
+      Exercise ID is automatically determined from course_config.toml
+      Shows submission results in a scratch buffer.
+
+  :TmcPaste                                                  *:TmcPaste*
+      Creates a paste of the current exercise for code review/sharing.
+
+Utilities ~
+  :TmcProjectsDir                                        *:TmcProjectsDir*
+      Displays the TMC projects directory path.
 
 =============================================================================
 SETTINGS                                                    *tmc-settings*
 
-  g:tmc_disable_default_mappings   (default: 0)
+g:tmc_cli_path                                           *g:tmc_cli_path*
+      Absolute path to tmc-langs-cli binary.
+      Default: auto-download to cache directory
+      
+      When set to a readable file, no download is attempted.
+      Example: >
+        let g:tmc_cli_path = '/usr/local/bin/tmc-langs-cli'
+<
+
+g:tmc_cli_version                                     *g:tmc_cli_version*
+      Version of tmc-langs-cli to download automatically.
+      Default: '0.38.1'
+      
+      Example: >
+        let g:tmc_cli_version = '0.40.0'
+<
+
+g:tmc_client_name                                     *g:tmc_client_name*
+      Client identifier sent to TMC server.
+      Default: 'tmc_vim'
+      
+      Generally should not be changed.
+
+g:tmc_client_version                               *g:tmc_client_version*
+      Client version sent to TMC server.
+      Default: '0.1.0'
+
+g:tmc_organization                                   *g:tmc_organization*
+      Organization slug used by :TmcCourses and related commands.
+      Default: 'mooc'
+      
+      Example: >
+        let g:tmc_organization = 'hy'
+<
+
+g:tmc_disable_default_mappings           *g:tmc_disable_default_mappings*
       Disable default <leader> mappings when non-zero.
+      Default: 0
+      
+      Example: >
+        let g:tmc_disable_default_mappings = 1
+<
 
-  g:tmc_cli_path                    (default: auto)
-      Absolute path to tmc-langs-cli. When set to a readable file, no download
-      is attempted.
-
-  g:tmc_cli_version                 (default: '0.38.1')
-      When auto-downloading the CLI, this version is used.
-
-  g:tmc_organization                (default: 'mooc')
-      Organization slug used by :TmcCourses and related flows.
+Environment Variables ~
+  TMC_LANGS_DEFAULT_PROJECTS_DIR       *TMC_LANGS_DEFAULT_PROJECTS_DIR*
+      Override the default projects directory.
+      
+      Example: >
+        export TMC_LANGS_DEFAULT_PROJECTS_DIR=~/tmc-exercises
+<
 
 =============================================================================
 DEFAULT MAPPINGS                                           *tmc-mappings*
 
-  <leader>tt     → :TmcRunTests
-  <leader>ts     → :TmcSubmit
-  To disable, set |g:tmc_disable_default_mappings| = 1.
+In normal mode:
+  <leader>tt     → :TmcRunTests       Run tests for current exercise
+  <leader>ts     → :TmcSubmit         Submit current exercise
+
+These mappings can be disabled by setting: >
+  let g:tmc_disable_default_mappings = 1
+<
+
+You can create custom mappings using <Plug> targets: >
+  nmap <F5> <Plug>(tmc-run-tests)
+  nmap <F6> <Plug>(tmc-submit-current)
+<
+
+Available <Plug> targets:
+  <Plug>(tmc-run-tests)               Run tests
+  <Plug>(tmc-submit-current)          Submit exercise
 
 =============================================================================
-AUTHOR & LICENSE
-  Daniel Koch (@Ukonhattu) 2025
-  GPLv3. See :help license.
+WORKFLOW                                                   *tmc-workflow*
+
+Typical TMC.vim workflow:
+
+1. Initial Setup ~
+   >
+   :TmcLogin student@example.com
+   :TmcPickOrg                    " Select organization if not 'mooc'
+<
+
+2. Select Course ~
+   >
+   :TmcPickCourse                 " Shows interactive course list
+                                  " Downloads exercises automatically
+                                  " Changes to course directory
+<
+
+3. Work on Exercise ~
+   >
+   " Navigate to exercise file (e.g., cd part01-exercise01)
+   :edit src/main.py
+   
+   " Make changes...
+   
+   " Run tests frequently
+   <leader>tt                     " or :TmcRunTests
+   
+   " Submit when all tests pass
+   <leader>ts                     " or :TmcSubmit
+<
+
+4. Advanced Usage ~
+   >
+   " List exercises manually
+   :TmcCourses
+   :TmcExercises 123
+   
+   " Download specific exercises
+   :TmcDownload 101 102
+   
+   " Share code for review
+   :TmcPaste
+<
+
+=============================================================================
+TROUBLESHOOTING                                      *tmc-troubleshooting*
+
+CLI Download Issues ~
+  If automatic download fails:
+  1. Manually download from:
+     https://github.com/rage/tmc-langs-rust/releases
+  2. Set path: >
+     let g:tmc_cli_path = '/path/to/tmc-langs-cli'
+<
+
+Projects Directory Not Found ~
+  Set the projects directory explicitly: >
+  export TMC_LANGS_DEFAULT_PROJECTS_DIR=~/tmc-exercises
+<
+  Or use tmc-langs-cli: >
+  !tmc-langs-cli settings move-projects-dir --client-name tmc_vim ~/tmc
+<
+
+Authentication Problems ~
+  - Verify credentials
+  - Check network connection
+  - Try: >
+    :TmcLogout
+    :TmcLogin
+<
+
+Exercise Root Not Found ~
+  Ensure you're inside an exercise directory with .tmcproject.yml
+  Check with: >
+  :!ls .tmcproject.yml
+<
+
+=============================================================================
+MODULE STRUCTURE                                           *tmc-modules*
+
+The plugin is organized into focused modules:
+
+autoload/tmc/util.vim         Message display (errors, info, success)
+autoload/tmc/project.vim      Exercise/project directory management
+autoload/tmc/course.vim       Course listing and data
+autoload/tmc/exercise.vim     Exercise listing and IDs
+autoload/tmc/cli.vim          CLI download and execution
+autoload/tmc/auth.vim         Authentication (login/logout)
+autoload/tmc/ui.vim           Interactive pickers and UI
+autoload/tmc/submit.vim       Exercise submission
+autoload/tmc/run_tests.vim    Test execution
+autoload/tmc/download.vim     Exercise downloads
+autoload/tmc/paste.vim        Code paste creation
+autoload/tmc/spinner.vim      Loading animations
+autoload/tmc/core.vim         Backward compatibility layer
+
+=============================================================================
+API                                                             *tmc-api*
+
+Public API functions for advanced usage:
+
+Utility Functions ~
+  tmc#util#echo_error({msg})
+  tmc#util#echo_info({msg})
+  tmc#util#echo_success({msg})
+
+Project Functions ~
+  tmc#project#get_dir()                  Get TMC projects directory
+  tmc#project#find_exercise_root()       Find current exercise root
+  tmc#project#get_exercise_id({root})    Extract exercise ID from config
+
+Course Functions ~
+  tmc#course#list()                      List courses for current org
+  tmc#course#get_list({org})             Get course data as list
+
+Exercise Functions ~
+  tmc#exercise#list({course_id})         List exercises for a course
+  tmc#exercise#get_list({course_id})     Get exercise data as list
+  tmc#exercise#get_ids({course_id})      Get exercise IDs as list
+
+=============================================================================
+AUTHOR & LICENSE                                           *tmc-license*
+
+Author:  Daniel Koch (@Ukonhattu)
+License: GPLv3
+Repository: https://github.com/ukonhattu/tmc.vim
+
+For bug reports and contributions, see:
+https://github.com/ukonhattu/tmc.vim/blob/main/CONTRIBUTING.md
+
+vim:tw=78:ts=8:ft=help:norl:

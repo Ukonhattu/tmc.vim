@@ -1,0 +1,56 @@
+" test/unit/test_course.vader
+" Tests for autoload/tmc/course.vim
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (tmc#course#get_list should parse course data):
+  " Mock the CLI response
+  function! tmc#cli#list_courses(org) abort
+    return test#mock_courses_response()
+  endfunction
+  
+  let courses = tmc#course#get_list('test-org')
+  
+  AssertEqual 2, len(courses), 'Should return 2 courses'
+  AssertEqual 1, courses[0]['id'], 'First course should have ID 1'
+  AssertEqual 'Test Course 1', courses[0]['name'], 'First course should have correct name'
+  
+  " Clean up
+  delfunction tmc#cli#list_courses
+
+Execute (tmc#course#get_list should handle empty response):
+  function! tmc#cli#list_courses(org) abort
+    return {}
+  endfunction
+  
+  let courses = tmc#course#get_list('test-org')
+  
+  AssertEqual 0, len(courses), 'Should return empty list for empty response'
+  
+  " Clean up
+  delfunction tmc#cli#list_courses
+
+Execute (tmc#course#get_list should handle legacy format):
+  function! tmc#cli#list_courses(org) abort
+    return {
+          \ 'data': {
+          \   'courses': [
+          \     {'id': 3, 'name': 'Legacy Course'}
+          \   ]
+          \ }
+          \ }
+  endfunction
+  
+  let courses = tmc#course#get_list('test-org')
+  
+  AssertEqual 1, len(courses), 'Should return 1 course from legacy format'
+  AssertEqual 'Legacy Course', courses[0]['name'], 'Should parse legacy format correctly'
+  
+  " Clean up
+  delfunction tmc#cli#list_courses
+

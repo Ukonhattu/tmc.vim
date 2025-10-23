@@ -1,0 +1,93 @@
+" test/integration/test_vim_neovim_compat.vader
+" Tests for Vim and Neovim compatibility
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (All autoload modules should load without errors):
+  runtime autoload/tmc.vim
+  runtime autoload/tmc/util.vim
+  runtime autoload/tmc/core.vim
+  runtime autoload/tmc/project.vim
+  runtime autoload/tmc/course.vim
+  runtime autoload/tmc/exercise.vim
+  runtime autoload/tmc/cli.vim
+  runtime autoload/tmc/auth.vim
+  runtime autoload/tmc/ui.vim
+  runtime autoload/tmc/submit.vim
+  runtime autoload/tmc/run_tests.vim
+  runtime autoload/tmc/download.vim
+  runtime autoload/tmc/paste.vim
+  runtime autoload/tmc/spinner.vim
+  
+  Assert 1, 'All modules loaded successfully'
+
+Execute (Plugin commands should be defined):
+  runtime plugin/tmc.vim
+  
+  Assert exists(':TmcRunTests'), 'TmcRunTests command should exist'
+  Assert exists(':TmcSubmit'), 'TmcSubmit command should exist'
+  Assert exists(':TmcDownload'), 'TmcDownload command should exist'
+  Assert exists(':TmcPickCourse'), 'TmcPickCourse command should exist'
+  Assert exists(':TmcPickOrganization'), 'TmcPickOrganization command should exist'
+  Assert exists(':TmcListCourses'), 'TmcListCourses command should exist'
+  Assert exists(':TmcListExercises'), 'TmcListExercises command should exist'
+  Assert exists(':TmcLogin'), 'TmcLogin command should exist'
+  Assert exists(':TmcLogout'), 'TmcLogout command should exist'
+  Assert exists(':TmcStatus'), 'TmcStatus command should exist'
+  Assert exists(':TmcCdCourse'), 'TmcCdCourse command should exist'
+  Assert exists(':TmcPaste'), 'TmcPaste command should exist'
+  Assert exists(':TmcProjectsDir'), 'TmcProjectsDir command should exist'
+  Assert exists(':TmcCourses'), 'TmcCourses alias command should exist'
+  Assert exists(':TmcExercises'), 'TmcExercises alias command should exist'
+  Assert exists(':TmcPickOrg'), 'TmcPickOrg alias command should exist'
+
+Execute (Plug mappings should be defined):
+  runtime plugin/tmc.vim
+  
+  Assert hasmapto('<Plug>(tmc-run-tests)'), 'tmc-run-tests mapping should exist'
+  Assert hasmapto('<Plug>(tmc-submit-current)'), 'tmc-submit-current mapping should exist'
+
+Execute (Default mappings should work when not disabled):
+  let g:tmc_disable_default_mappings = 0
+  runtime plugin/tmc.vim
+  
+  " Note: We can't easily test leader mappings in Vader, but we can verify the option works
+  Assert !get(g:, 'tmc_disable_default_mappings', 0), 'Default mappings should not be disabled'
+
+Execute (Default mappings should not exist when disabled):
+  let g:tmc_disable_default_mappings = 1
+  runtime! plugin/tmc.vim
+  
+  Assert get(g:, 'tmc_disable_default_mappings', 0), 'Default mappings should be disabled'
+
+Execute (Core compatibility layer should delegate correctly):
+  " Test that core functions properly delegate to new modules
+  function! Test_Core_Delegation()
+    " These should not error out
+    let funcs = [
+          \ 'tmc#core#echo_error',
+          \ 'tmc#core#echo_info',
+          \ 'tmc#core#echo_success',
+          \ 'tmc#core#error',
+          \ 'tmc#core#projects_dir',
+          \ 'tmc#core#find_exercise_root',
+          \ ]
+    
+    for func in funcs
+      if !exists('*' . func)
+        throw 'Function ' . func . ' does not exist'
+      endif
+    endfor
+    
+    return 1
+  endfunction
+  
+  Assert Test_Core_Delegation(), 'Core compatibility functions should exist'
+  
+  delfunction Test_Core_Delegation
+

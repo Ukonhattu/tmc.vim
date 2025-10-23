@@ -1,0 +1,71 @@
+" test/integration/test_workflow.vader
+" Integration tests for common workflows
+
+Before:
+  source test/helpers.vim
+  call test#setup()
+
+After:
+  call test#teardown()
+
+Execute (Backward compatibility: old API should still work):
+  " Test that the old tmc#list_courses() function works
+  function! tmc#cli#list_courses(org) abort
+    return test#mock_courses_response()
+  endfunction
+  
+  function! tmc#cli#list_exercises(course_id) abort
+    return test#mock_exercises_response()
+  endfunction
+  
+  " These should work through backward compatibility layer
+  let courses = tmc#course#get_list('test-org')
+  AssertEqual 2, len(courses), 'Old API should work for courses'
+  
+  let exercises = tmc#exercise#get_list('1')
+  AssertEqual 2, len(exercises), 'Old API should work for exercises'
+  
+  let ids = tmc#exercise#get_ids('1')
+  AssertEqual 2, len(ids), 'Old API should work for exercise IDs'
+  
+  " Clean up
+  delfunction tmc#cli#list_courses
+  delfunction tmc#cli#list_exercises
+
+Execute (Exercise workflow: find root and extract ID):
+  " Create a complete mock exercise structure
+  let temp_dir = test#create_temp_dir()
+  let course_dir = temp_dir . '/test-course'
+  let exercise_dir = course_dir . '/part01-exercise1'
+  let src_dir = exercise_dir . '/src'
+  
+  call mkdir(src_dir, 'p')
+  call writefile([''], exercise_dir . '/.tmcproject.yml')
+  call test#create_mock_course_config(course_dir, 'part01-exercise1', '999')
+  
+  let test_file = src_dir . '/main.py'
+  call writefile(['print("test")'], test_file)
+  
+  " Open the file
+  execute 'edit' test_file
+  
+  " Find exercise root
+  let root = tmc#project#find_exercise_root()
+  AssertEqual exercise_dir, root, 'Should find correct exercise root'
+  
+  " Get exercise ID
+  let ex_id = tmc#project#get_exercise_id(root)
+  AssertEqual '999', ex_id, 'Should extract correct exercise ID'
+  
+  " Clean up
+  execute 'bwipeout!'
+  call delete(temp_dir, 'rf')
+
+Execute (Projects directory resolution should work):
+  let $TMC_LANGS_DEFAULT_PROJECTS_DIR = '/tmp/tmc-projects-test'
+  
+  let dir = tmc#project#get_dir()
+  
+  Assert !empty(dir), 'Should resolve projects directory'
+  Assert match(dir, 'tmc-projects-test') >= 0, 'Should use environment variable'
+
