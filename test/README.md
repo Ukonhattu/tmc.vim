@@ -100,10 +100,10 @@ vim -Nu NONE \
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (Test case description):
   " Arrange
@@ -127,11 +127,11 @@ Vader.vim provides these assertions:
 ### Test Helpers
 
 The `test/helpers.vim` file provides:
-- `test#setup()` - Set up test environment
-- `test#teardown()` - Clean up after tests
-- `test#mock_*_response()` - Mock API responses
-- `test#create_temp_dir()` - Create temporary directory
-- `test#create_mock_exercise_root()` - Create mock exercise
+- `helpers#setup()` - Set up test environment
+- `helpers#teardown()` - Clean up after tests
+- `helpers#mock_*_response()` - Mock API responses
+- `helpers#create_temp_dir()` - Create temporary directory
+- `helpers#create_mock_exercise_root()` - Create mock exercise
 - Custom assertions
 
 ### Best Practices
@@ -147,9 +147,9 @@ The `test/helpers.vim` file provides:
 ```vader
 Execute (tmc#project#find_exercise_root should find .tmcproject.yml):
   " Arrange
-  let temp_dir = test#create_temp_dir()
+  let temp_dir = helpers#create_temp_dir()
   let exercise_dir = temp_dir . '/exercise1'
-  call test#create_mock_exercise_root(exercise_dir)
+  call helpers#create_mock_exercise_root(exercise_dir)
   call writefile(['test'], exercise_dir . '/test.py')
   
   " Act

@@ -3,15 +3,15 @@
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (tmc#exercise#get_list should parse exercise data):
   " Mock the CLI response
   function! tmc#cli#list_exercises(course_id) abort
-    return test#mock_exercises_response()
+    return helpers#mock_exercises_response()
   endfunction
   
   let exercises = tmc#exercise#get_list('1')
@@ -25,7 +25,7 @@ Execute (tmc#exercise#get_list should parse exercise data):
 
 Execute (tmc#exercise#get_ids should extract exercise IDs):
   function! tmc#cli#list_exercises(course_id) abort
-    return test#mock_exercises_response()
+    return helpers#mock_exercises_response()
   endfunction
   
   let ids = tmc#exercise#get_ids('1')

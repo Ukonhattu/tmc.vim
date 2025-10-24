@@ -3,10 +3,10 @@
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (tmc#util#echo_error should display error message):
   redir => output

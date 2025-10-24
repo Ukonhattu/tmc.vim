@@ -3,19 +3,19 @@
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (Backward compatibility: old API should still work):
   " Test that the old tmc#list_courses() function works
   function! tmc#cli#list_courses(org) abort
-    return test#mock_courses_response()
+    return helpers#mock_courses_response()
   endfunction
   
   function! tmc#cli#list_exercises(course_id) abort
-    return test#mock_exercises_response()
+    return helpers#mock_exercises_response()
   endfunction
   
   " These should work through backward compatibility layer
@@ -34,14 +34,14 @@ Execute (Backward compatibility: old API should still work):
 
 Execute (Exercise workflow: find root and extract ID):
   " Create a complete mock exercise structure
-  let temp_dir = test#create_temp_dir()
+  let temp_dir = helpers#create_temp_dir()
   let course_dir = temp_dir . '/test-course'
   let exercise_dir = course_dir . '/part01-exercise1'
   let src_dir = exercise_dir . '/src'
   
   call mkdir(src_dir, 'p')
   call writefile([''], exercise_dir . '/.tmcproject.yml')
-  call test#create_mock_course_config(course_dir, 'part01-exercise1', '999')
+  call helpers#create_mock_course_config(course_dir, 'part01-exercise1', '999')
   
   let test_file = src_dir . '/main.py'
   call writefile(['print("test")'], test_file)

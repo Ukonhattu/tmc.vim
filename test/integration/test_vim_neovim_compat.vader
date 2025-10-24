@@ -3,10 +3,10 @@
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (All autoload modules should load without errors):
   runtime autoload/tmc.vim

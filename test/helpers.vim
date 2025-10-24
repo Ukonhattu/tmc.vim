@@ -5,7 +5,7 @@
 " Test Setup and Teardown
 " ===========================
 
-function! test#setup() abort
+function! helpers#setup() abort
   " Set up test environment
   let g:tmc_cli_path = 'mock-tmc-cli'
   let g:tmc_client_name = 'test_client'
@@ -14,7 +14,7 @@ function! test#setup() abort
   let $TMC_LANGS_DEFAULT_PROJECTS_DIR = '/tmp/tmc-test-projects'
 endfunction
 
-function! test#teardown() abort
+function! helpers#teardown() abort
   " Clean up test environment
   unlet! g:tmc_cli_path
   unlet! g:tmc_client_name
@@ -31,12 +31,12 @@ endfunction
 " ===========================
 
 " Mock CLI ensure function
-function! test#mock_cli_ensure() abort
+function! helpers#mock_cli_ensure() abort
   return 'mock-tmc-cli'
 endfunction
 
 " Create a mock course response
-function! test#mock_courses_response() abort
+function! helpers#mock_courses_response() abort
   return {
         \ 'data': {
         \   'output-data': [
@@ -48,7 +48,7 @@ function! test#mock_courses_response() abort
 endfunction
 
 " Create a mock exercises response
-function! test#mock_exercises_response() abort
+function! helpers#mock_exercises_response() abort
   return {
         \ 'data': {
         \   'output-data': [
@@ -60,7 +60,7 @@ function! test#mock_exercises_response() abort
 endfunction
 
 " Create a mock organizations response
-function! test#mock_organizations_response() abort
+function! helpers#mock_organizations_response() abort
   return {
         \ 'data': {
         \   'output-data-kind': 'organizations',
@@ -76,35 +76,35 @@ endfunction
 " Test Assertions
 " ===========================
 
-function! test#assert_equal(expected, actual, ...) abort
+function! helpers#assert_equal(expected, actual, ...) abort
   let l:msg = get(a:, 1, 'Values should be equal')
   if a:expected != a:actual
     throw printf('AssertionError: %s. Expected: %s, Got: %s', l:msg, string(a:expected), string(a:actual))
   endif
 endfunction
 
-function! test#assert_not_equal(expected, actual, ...) abort
+function! helpers#assert_not_equal(expected, actual, ...) abort
   let l:msg = get(a:, 1, 'Values should not be equal')
   if a:expected == a:actual
     throw printf('AssertionError: %s. Both values: %s', l:msg, string(a:expected))
   endif
 endfunction
 
-function! test#assert_true(value, ...) abort
+function! helpers#assert_true(value, ...) abort
   let l:msg = get(a:, 1, 'Value should be true')
   if !a:value
     throw printf('AssertionError: %s. Got: %s', l:msg, string(a:value))
   endif
 endfunction
 
-function! test#assert_false(value, ...) abort
+function! helpers#assert_false(value, ...) abort
   let l:msg = get(a:, 1, 'Value should be false')
   if a:value
     throw printf('AssertionError: %s. Got: %s', l:msg, string(a:value))
   endif
 endfunction
 
-function! test#assert_match(pattern, string, ...) abort
+function! helpers#assert_match(pattern, string, ...) abort
   let l:msg = get(a:, 1, 'String should match pattern')
   if a:string !~# a:pattern
     throw printf('AssertionError: %s. Pattern: %s, String: %s', l:msg, a:pattern, a:string)
@@ -115,20 +115,20 @@ endfunction
 " Temporary File Helpers
 " ===========================
 
-function! test#create_temp_dir() abort
+function! helpers#create_temp_dir() abort
   let l:dir = tempname()
   call mkdir(l:dir, 'p')
   return l:dir
 endfunction
 
-function! test#create_mock_exercise_root(root) abort
+function! helpers#create_mock_exercise_root(root) abort
   " Create a mock exercise structure
   call mkdir(a:root, 'p')
   call writefile([''], a:root . '/.tmcproject.yml')
   return a:root
 endfunction
 
-function! test#create_mock_course_config(course_root, exercise_slug, exercise_id) abort
+function! helpers#create_mock_course_config(course_root, exercise_slug, exercise_id) abort
   " Create a mock course_config.toml
   let l:config = [
         \ '[course]',

@@ -3,15 +3,15 @@
 
 Before:
   source test/helpers.vim
-  call test#setup()
+  call helpers#setup()
 
 After:
-  call test#teardown()
+  call helpers#teardown()
 
 Execute (tmc#course#get_list should parse course data):
   " Mock the CLI response
   function! tmc#cli#list_courses(org) abort
-    return test#mock_courses_response()
+    return helpers#mock_courses_response()
   endfunction
   
   let courses = tmc#course#get_list('test-org')
