@@ -1,0 +1,69 @@
+" test/integration/test_workflow.vader
+" Integration tests for common workflows
+
+Before:
+  source test/helpers.vim
+  call helpers#setup()
+
+After:
+  call helpers#teardown()
+
+Execute (Backward compatibility: old API functions should exist):
+  " Load the backward compatibility layer explicitly
+  runtime autoload/tmc.vim
+  
+  " Test that the backward compatibility functions exist and are callable
+  " We can't mock the CLI layer in tests due to autoload naming constraints,
+  " so we just verify the functions exist
+  Assert exists('*tmc#list_courses'), 'tmc#list_courses should exist'
+  Assert exists('*tmc#list_exercises'), 'tmc#list_exercises should exist'
+  Assert exists('*tmc#cd_course'), 'tmc#cd_course should exist'
+  Assert exists('*tmc#submit_current'), 'tmc#submit_current should exist'
+  Assert exists('*tmc#run_tests_current'), 'tmc#run_tests_current should exist'
+  Assert exists('*tmc#projects_dir'), 'tmc#projects_dir should exist'
+  
+  " Test direct module functions work
+  " These are safe to call without CLI as they just parse data
+  let mock_data = helpers#mock_courses_response()
+  Assert has_key(mock_data, 'data'), 'Mock data should have data key'
+  
+  let mock_exercises = helpers#mock_exercises_response()
+  Assert has_key(mock_exercises, 'data'), 'Mock exercises should have data key'
+
+Execute (Exercise workflow: find root and extract ID):
+  " Create a complete mock exercise structure
+  let temp_dir = helpers#create_temp_dir()
+  let course_dir = temp_dir . '/test-course'
+  let exercise_dir = course_dir . '/part01-exercise1'
+  let src_dir = exercise_dir . '/src'
+  
+  call mkdir(src_dir, 'p')
+  call writefile([''], exercise_dir . '/.tmcproject.yml')
+  call helpers#create_mock_course_config(course_dir, 'part01-exercise1', '999')
+  
+  let test_file = src_dir . '/main.py'
+  call writefile(['print("test")'], test_file)
+  
+  " Open the file
+  execute 'edit' test_file
+  
+  " Find exercise root
+  let root = tmc#project#find_exercise_root()
+  AssertEqual exercise_dir, root, 'Should find correct exercise root'
+  
+  " Get exercise ID
+  let ex_id = tmc#project#get_exercise_id(root)
+  AssertEqual '999', ex_id, 'Should extract correct exercise ID'
+  
+  " Clean up
+  execute 'bwipeout!'
+  call delete(temp_dir, 'rf')
+
+Execute (Projects directory resolution should work):
+  let $TMC_LANGS_DEFAULT_PROJECTS_DIR = '/tmp/tmc-projects-test'
+  
+  let dir = tmc#project#get_dir()
+  
+  Assert !empty(dir), 'Should resolve projects directory'
+  Assert match(dir, 'tmc-projects-test') >= 0, 'Should use environment variable'
+

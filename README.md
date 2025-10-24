@@ -1,22 +1,31 @@
 # TMC-Vim
-----
-This version should work so that it is possible to do everything a coure might need. If you find bugs,
-problems, or have feature requests, open a issue.
 
-Tested with Neovim with Telescope and with Vim with fzf.vim. Should work without any dependencies, but I haven't tested that properly yet.
+[![CI](https://github.com/ukonhattu/tmc.vim/workflows/CI/badge.svg)](https://github.com/ukonhattu/tmc.vim/actions)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-Does not have any persistence yet, meaning it will not remember selected Org or course,
-however, for any commands needing a course parameter, it should infer it from
-the folder.
+A Vim/Neovim plugin that integrates [tmc-langs-cli](https://github.com/rage/tmc-langs-rust/tree/main/crates/tmc-langs-cli) 
+for working with Test-My-Code exercises directly from your editor.
 
+## Features
 
-----
+- Authentication with TMC server
+- Interactive course and exercise browsing
+- Automatic exercise download and updates
+- Local test execution with formatted results
+- Exercise submission with instant feedback
+- Vim 8.2+ and Neovim 0.5+ support
+- Multiple UI backends (Telescope, fzf.vim, native popups)
+- Automatic CLI binary download with SHA-256 verification
 
-`tmc.vim` is a simple Vim plugin that integrates the
-[tmc‑langs‑cli](https://github.com/rage/tmc-langs-rust/tree/main/crates/tmc-langs-cli) into Vim.  It allows you to
-log in to the Test‑My‑Code service, list courses and exercises, download
-exercise templates and submit completed exercises – all without leaving the
-editor.
+## Quick Start
+
+1. Install the plugin with your plugin manager
+2. Login to TMC: `:TmcLogin your@email.com`
+3. Select a course: `:TmcPickCourse`
+4. Navigate to an exercise and run tests: `<leader>tt` or `:TmcRunTests`
+5. Submit your solution: `<leader>ts` or `:TmcSubmit`
+
+See the [Commands](#commands) section for detailed usage.
 
 ## Installation
 
@@ -66,18 +75,42 @@ editor.
 | `:TmcRunTests` | Runs tests for the exercise containing the current buffer.  The plugin calls the CLI’s `run-tests` subcommand with the exercise directory as `--exercise-path` and displays the output in a scratch buffer. |
 | `:TmcSubmitCurrent` | Submits the exercise containing the current buffer.  The exercise ID is determined by reading `course_config.toml` in the course root to map the current exercise slug to its numeric ID.  If no mapping is found, you are prompted to enter the ID.  Uses the same submission command as `:TmcSubmit`. |
 | `:TmcSetOrg <slug>` | Changes the organisation slug used by `:TmcCourses`.  The slug corresponds to the parameter of the GetCourses command. |
-| `:TmcPickCourse` | Opens a menu to select a course.  Once a course is selected, its exercises are downloaded automatically and then change working direcctory to the courses directory. Run this too if you want to update the exercises or download new ones. (Will add command for those later).  |
-|`:TmcPickOrg` | Opens a popip menu select an organisation.
-|`:TmcCdCourse`| Change vim's current working directory to the last picked course
+| `:TmcPickCourse` | Opens a menu to select a course.  Once a course is selected, its exercises are downloaded automatically and then changes working directory to the course's directory. Run this too if you want to update the exercises or download new ones. (Will add command for those later).  |
+|`:TmcPickOrg` | Opens a popup menu to select an organisation.
+|`:TmcCdCourse`| Change Vim's current working directory to the last picked course
 | `:Tmc <subcommand> [args...]` | Runs an arbitrary `tmc-langs-cli` command. If running  `tmc` or `mooc` subcommand, --client-name and --client-version are automatically added to the command. Mooc command has not been tested yet.|
 
-Additional variables:
+## Configuration
 
-* `g:tmc_cli_path` – override the name/path of the CLI binary (default
-  `tmc‑langs‑cli`).
-* `g:tmc_organization` – default organisation slug used by `:TmcCourses`.  Initially set to `mooc`.
-* `g:tmc_disable_default_mappings` – if set to a non‑zero value, disables the default key mappings (`<leader>tt` to run tests and `<leader>ts` to submit).
-* If you want to change where exercises are downloaded, modify environment variable `TMC_LANGS_DEFAULT_PROJECTS_DIR`.
+### Plugin Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `g:tmc_cli_path` | auto-download | Path to tmc-langs-cli binary. Set to override automatic download. |
+| `g:tmc_cli_version` | `'0.38.1'` | Version to download automatically if binary not found. |
+| `g:tmc_organization` | `'mooc'` | Default organization slug for course listings. |
+| `g:tmc_disable_default_mappings` | `0` | Set to `1` to disable default `<leader>tt` and `<leader>ts` mappings. |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `TMC_LANGS_DEFAULT_PROJECTS_DIR` | Override default exercises download location. |
+
+### Example Configuration
+
+```vim
+" Use custom CLI binary
+let g:tmc_cli_path = '/usr/local/bin/tmc-langs-cli'
+
+" Use different organization
+let g:tmc_organization = 'hy'
+
+" Disable default mappings and set custom ones
+let g:tmc_disable_default_mappings = 1
+nmap <F5> <Plug>(tmc-run-tests)
+nmap <F6> <Plug>(tmc-submit-current)
+```
 
 ## Notes
 
@@ -87,7 +120,84 @@ Additional variables:
   without remembering exercise IDs.  By default `<leader>tt` calls
   `:TmcRunTests` and `<leader>ts` calls `:TmcSubmitCurrent`.  These mappings
   can be disabled by setting `g:tmc_disable_default_mappings`.
-* Current Workflow is to run `:TmcPickCourse` (This will cd to course directory too) (Now it defaults to mooc org, run `TmcPickOrg` to change), navigate however you want to the exercise, when in exercise you can run `<leader>tt` to run tests and `<leader>ts` to submit. (or `:TmcRunRests` and `:TmcSubmitCurrent`)
+* Current Workflow is to run `:TmcPickCourse` (This will cd to course directory too) (Now it defaults to mooc org, run `TmcPickOrg` to change), navigate however you want to the exercise, when in exercise you can run `<leader>tt` to run tests and `<leader>ts` to submit. (or `:TmcRunTests` and `:TmcSubmit`)
+
+## Troubleshooting
+
+### CLI Download Issues
+If the plugin fails to download `tmc-langs-cli`, you can:
+1. Manually download the binary from [tmc-langs-rust releases](https://github.com/rage/tmc-langs-rust/releases)
+2. Set `g:tmc_cli_path` to point to your downloaded binary
+
+### Projects Directory Issues
+If you see errors about the projects directory:
+1. Set the environment variable: `export TMC_LANGS_DEFAULT_PROJECTS_DIR=~/tmc-exercises`
+2. Or run: `tmc-langs-cli settings move-projects-dir --client-name tmc_vim ~/tmc-exercises`
+
+### Authentication Issues
+If login fails:
+- Ensure you're using the correct email and password
+- Check your network connection
+- Try running `:TmcLogout` and then `:TmcLogin` again
+
+## Testing
+
+This plugin includes a comprehensive test suite using Vader.vim. To run tests:
+
+```bash
+# Install Vader.vim
+git clone --depth 1 https://github.com/junegunn/vader.vim.git ~/.vim/plugged/vader.vim
+
+# Run tests with Vim
+vim -Nu NONE \
+  -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
+  -c "runtime plugin/tmc.vim" \
+  -c "Vader! test/**/*.vader"
+
+# Run tests with Neovim
+nvim --headless -u NONE \
+  -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
+  -c "runtime plugin/tmc.vim" \
+  -c "Vader! test/**/*.vader"
+```
+
+See [test/README.md](test/README.md) for detailed testing documentation.
+
+## Development
+
+For information on contributing, code structure, and development setup, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Project Structure
+
+```
+autoload/tmc/
+├── util.vim          - Utility functions (messaging)
+├── project.vim       - Project and exercise management
+├── course.vim        - Course listing and data
+├── exercise.vim      - Exercise management
+├── cli.vim           - CLI integration
+├── auth.vim          - Authentication
+├── ui.vim            - Interactive UI components
+├── submit.vim        - Exercise submission
+├── run_tests.vim     - Test execution
+├── download.vim      - Exercise downloads
+└── ...
+```
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Setting up the development environment
+- Running tests and linting
+- Submitting pull requests
+- Code style conventions
+
+## Documentation
+
+- **User Guide**: `:help tmc` (after installation)
+- **Testing Guide**: [test/README.md](test/README.md)
+- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Refactoring Summary**: [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)
 
 ## License
 

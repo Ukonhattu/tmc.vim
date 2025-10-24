@@ -1,3 +1,4 @@
+scriptencoding utf-8
 
 " plugin/tmc.vim
 " Entry points for commands and mappings

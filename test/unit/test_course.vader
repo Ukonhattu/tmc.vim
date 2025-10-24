@@ -1,0 +1,25 @@
+" test/unit/test_course.vader
+" Tests for autoload/tmc/course.vim
+
+Before:
+  source test/helpers.vim
+  call helpers#setup()
+
+After:
+  call helpers#teardown()
+
+Execute (Course module functions should exist):
+  " Load the course module explicitly
+  runtime autoload/tmc/course.vim
+  
+  " Verify the course module functions are defined
+  Assert exists('*tmc#course#list'), 'tmc#course#list should exist'
+  Assert exists('*tmc#course#get_list'), 'tmc#course#get_list should exist'
+
+Execute (Mock data should have correct structure):
+  " Test that mock data is structured correctly
+  let mock_data = helpers#mock_courses_response()
+  Assert has_key(mock_data, 'data'), 'Mock data should have data key'
+  Assert has_key(mock_data['data'], 'output-data'), 'Mock data should have output-data'
+  AssertEqual 2, len(mock_data['data']['output-data']), 'Mock should have 2 courses'
+

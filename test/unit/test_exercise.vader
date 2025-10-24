@@ -1,0 +1,28 @@
+" test/unit/test_exercise.vader
+" Tests for autoload/tmc/exercise.vim
+
+Before:
+  source test/helpers.vim
+  call helpers#setup()
+
+After:
+  call helpers#teardown()
+
+Execute (Exercise module functions should exist):
+  " Load the exercise module explicitly
+  runtime autoload/tmc/exercise.vim
+  
+  " Verify the exercise module functions are defined
+  Assert exists('*tmc#exercise#list'), 'tmc#exercise#list should exist'
+  Assert exists('*tmc#exercise#get_list'), 'tmc#exercise#get_list should exist'
+  Assert exists('*tmc#exercise#get_ids'), 'tmc#exercise#get_ids should exist'
+  Assert exists('*tmc#exercise#get_available_ids'), 'tmc#exercise#get_available_ids should exist'
+
+Execute (Mock exercise data should have correct structure):
+  " Test that mock data is structured correctly
+  let mock_data = helpers#mock_exercises_response()
+  Assert has_key(mock_data, 'data'), 'Mock data should have data key'
+  Assert has_key(mock_data['data'], 'output-data'), 'Mock data should have output-data'
+  AssertEqual 2, len(mock_data['data']['output-data']), 'Mock should have 2 exercises'
+  AssertEqual 101, mock_data['data']['output-data'][0]['id'], 'First exercise should have ID 101'
+

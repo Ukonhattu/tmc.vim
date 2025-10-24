@@ -1,0 +1,29 @@
+cmdargs:
+  # Severity should be one of: error, warning, style_problem
+  severity: style_problem
+  # Maximum number of violations before exiting
+  max-violations: -1
+  # Color output
+  color: true
+  # Enable/disable specific policies
+  policies:
+    # Allow single-letter variable names in limited contexts
+    ProhibitUnnecessaryDoubleQuote:
+      enabled: true
+    ProhibitUsingUndeclaredVariable:
+      enabled: false  # Too many false positives with Vim's scoping
+    ProhibitAbbreviationOption:
+      enabled: true
+    ProhibitSetNoCompatible:
+      enabled: true
+    ProhibitCommandRelyOnUser:
+      enabled: true
+    ProhibitCommandWithUnintendedSideEffect:
+      enabled: true
+    ProhibitImplicitScopeVariable:
+      enabled: false  # We use script-local variables
+    ProhibitMissingAbortKeyword:
+      enabled: true
+    ProhibitUnusedVariable:
+      enabled: false  # Too many false positives
+

@@ -24,7 +24,7 @@ function! tmc#auth#login(...) abort
   " subcommand and do not call tmc#run_cli() because that uses system()
   " without input redirection.
   let l:cli_path = tmc#cli#ensure()
-  let l:cmd_list = [l:cli_path, 'tmc', '--client-name', g:client_name, '--client-version', g:client_version,
+  let l:cmd_list = [l:cli_path, 'tmc', '--client-name', g:tmc_client_name, '--client-version', g:tmc_client_version,
         \ 'login', '--email', l:email, '--stdin']
   let l:cmd = join(l:cmd_list, ' ')
   " Pass the password via stdin with a trailing newline so the CLI reads it.
@@ -51,10 +51,10 @@ function! tmc#auth#logout() abort
   call tmc#cli#ensure()
 
   let l:cmd = [
-        \ g:cli_path,
+        \ g:tmc_cli_path,
         \ 'tmc',
-        \ '--client-name', g:client_name,
-        \ '--client-version', g:client_version,
+        \ '--client-name', g:tmc_client_name,
+        \ '--client-version', g:tmc_client_version,
         \ 'logout'
         \ ]
 
@@ -83,10 +83,10 @@ function! tmc#auth#status() abort
   call tmc#cli#ensure()
 
   let l:cmd = [
-        \ g:cli_path,
+        \ g:tmc_cli_path,
         \ 'tmc',
-        \ '--client-name', g:client_name,
-        \ '--client-version', g:client_version,
+        \ '--client-name', g:tmc_client_name,
+        \ '--client-version', g:tmc_client_version,
         \ 'logged-in'
         \ ]
 

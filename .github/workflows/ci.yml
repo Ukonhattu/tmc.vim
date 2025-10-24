@@ -1,0 +1,191 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.editor }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Vim versions
+          - os: ubuntu-latest
+            editor: vim-8.2
+            version: v8.2.0000
+            neovim: false
+          - os: ubuntu-latest
+            editor: vim-9.0
+            version: v9.0.0000
+            neovim: false
+          - os: macos-latest
+            editor: vim-9.0
+            version: v9.0.0000
+            neovim: false
+          # Neovim versions
+          - os: ubuntu-latest
+            editor: neovim-0.5
+            version: v0.5.0
+            neovim: true
+          - os: ubuntu-latest
+            editor: neovim-0.9
+            version: v0.9.0
+            neovim: true
+          - os: macos-latest
+            editor: neovim-0.9
+            version: v0.9.0
+            neovim: true
+          - os: ubuntu-latest
+            editor: neovim-stable
+            version: stable
+            neovim: true
+          - os: macos-latest
+            editor: neovim-stable
+            version: stable
+            neovim: true
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Vim/Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          version: ${{ matrix.version }}
+          neovim: ${{ matrix.neovim }}
+
+      - name: Smoke test - Plugin loads
+        run: |
+          if command -v nvim &> /dev/null; then
+            echo "Testing with Neovim"
+            nvim --version
+            nvim --headless -u NONE \
+              -c "set runtimepath+=." \
+              -c "runtime plugin/tmc.vim" \
+              -c "if exists(':TmcRunTests') | echo 'Plugin loaded successfully' | cquit 0 | else | echo 'Plugin failed to load' | cquit 1 | endif"
+          else
+            echo "Testing with Vim"
+            vim --version
+            vim -Nu NONE \
+              -c "set runtimepath+=." \
+              -c "runtime plugin/tmc.vim" \
+              -c "if exists(':TmcRunTests') | echo 'Plugin loaded successfully' | qall! | else | echo 'Plugin failed to load' | cquit | endif"
+          fi
+
+      - name: Install Vader.vim
+        run: |
+          git clone --depth 1 https://github.com/junegunn/vader.vim.git ~/.vim/plugged/vader.vim
+          mkdir -p ~/.local/share/nvim/site/pack/vendor/start
+          ln -s ~/.vim/plugged/vader.vim ~/.local/share/nvim/site/pack/vendor/start/vader.vim || true
+
+      - name: Run tests
+        run: |
+          # Find all vader test files
+          TEST_FILES=$(find test -name "*.vader" -type f | sort)
+          echo "Found test files:"
+          echo "$TEST_FILES"
+          
+          if command -v nvim &> /dev/null; then
+            nvim --version
+            for test_file in $TEST_FILES; do
+              echo "============================================"
+              echo "Running test: $test_file"
+              echo "============================================"
+              nvim --headless -u NONE \
+                -c "set runtimepath^=~/.vim/plugged/vader.vim" \
+                -c "set runtimepath^=." \
+                -c "filetype plugin indent on" \
+                -c "runtime! plugin/**/*.vim" \
+                -c "Vader! $test_file" 2>&1 | tee -a test_output.log
+              if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                echo "FAILED: $test_file"
+                exit 1
+              fi
+            done
+          else
+            vim --version
+            for test_file in $TEST_FILES; do
+              echo "============================================"
+              echo "Running test: $test_file"
+              echo "============================================"
+              vim -Nu NONE \
+                -c "set runtimepath^=~/.vim/plugged/vader.vim" \
+                -c "set runtimepath^=." \
+                -c "filetype plugin indent on" \
+                -c "runtime! plugin/**/*.vim" \
+                -c "Vader! $test_file" 2>&1 | tee -a test_output.log
+              if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                echo "FAILED: $test_file"
+                exit 1
+              fi
+            done
+          fi
+          echo "All tests passed!"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.editor }}-${{ matrix.os }}
+          path: test_output.log
+
+  lint:
+    name: Lint VimScript
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install vint
+        run: |
+          pip install setuptools
+          pip install vim-vint
+
+      - name: Run vint
+        run: |
+          vint --version
+          vint autoload/ plugin/
+
+  docs:
+    name: Validate documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README
+        run: |
+          if ! grep -q "TMC-Vim" README.md; then
+            echo "README.md seems invalid"
+            exit 1
+          fi
+          echo "README.md looks good"
+
+      - name: Check help doc exists
+        run: |
+          if [ ! -f "doc/tmc.txt" ]; then
+            echo "Help documentation is missing"
+            exit 1
+          fi
+          echo "Help documentation exists"
+
+      - name: Check LICENSE
+        run: |
+          if [ ! -f "LICENSE" ]; then
+            echo "LICENSE file is missing"
+            exit 1
+          fi
+          echo "LICENSE file exists"
+
