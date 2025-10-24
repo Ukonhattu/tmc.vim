@@ -1,3 +1,4 @@
+scriptencoding utf-8
 
 if exists('g:loaded_tmc')
   finish
@@ -43,7 +44,7 @@ function! tmc#logout() abort
   return tmc#auth#logout()
 endfunction
 
-function tmc#status() abort
+function! tmc#status() abort
   return tmc#auth#status()
 endfunction
 

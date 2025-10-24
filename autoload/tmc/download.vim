@@ -1,3 +1,4 @@
+scriptencoding utf-8
 
 " autoload/tmc/download.vim
 "

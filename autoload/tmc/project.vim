@@ -1,3 +1,4 @@
+scriptencoding utf-8
 
 " autoload/tmc/project.vim
 " Project and exercise root management functions
