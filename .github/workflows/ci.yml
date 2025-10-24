@@ -148,7 +148,9 @@ jobs:
           python-version: '3.x'
 
       - name: Install vint
-        run: pip install vim-vint
+        run: |
+          pip install setuptools
+          pip install vim-vint
 
       - name: Run vint
         run: |
