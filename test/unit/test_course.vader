@@ -9,6 +9,9 @@ After:
   call helpers#teardown()
 
 Execute (Course module functions should exist):
+  " Load the course module explicitly
+  runtime autoload/tmc/course.vim
+  
   " Verify the course module functions are defined
   Assert exists('*tmc#course#list'), 'tmc#course#list should exist'
   Assert exists('*tmc#course#get_list'), 'tmc#course#get_list should exist'

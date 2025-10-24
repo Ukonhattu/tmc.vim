@@ -9,6 +9,9 @@ After:
   call helpers#teardown()
 
 Execute (Exercise module functions should exist):
+  " Load the exercise module explicitly
+  runtime autoload/tmc/exercise.vim
+  
   " Verify the exercise module functions are defined
   Assert exists('*tmc#exercise#list'), 'tmc#exercise#list should exist'
   Assert exists('*tmc#exercise#get_list'), 'tmc#exercise#get_list should exist'
