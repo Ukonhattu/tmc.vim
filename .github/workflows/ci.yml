@@ -61,34 +61,46 @@ jobs:
       - name: Run tests
         run: |
           # Find all vader test files
-          TEST_FILES=$(find test -name "*.vader" -type f | tr '\n' ' ')
-          echo "Found test files: $TEST_FILES"
+          TEST_FILES=$(find test -name "*.vader" -type f | sort)
+          echo "Found test files:"
+          echo "$TEST_FILES"
           
           if command -v nvim &> /dev/null; then
             nvim --version
             for test_file in $TEST_FILES; do
+              echo "============================================"
               echo "Running test: $test_file"
+              echo "============================================"
               nvim --headless -u NONE \
                 -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
                 -c "runtime plugin/tmc.vim" \
-                -c "Vader! $test_file" 2>&1 | tee -a test_output.log || echo "Test $test_file had issues (non-blocking)"
+                -c "Vader! $test_file" 2>&1 | tee -a test_output.log
+              if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                echo "FAILED: $test_file"
+                exit 1
+              fi
             done
           else
             vim --version
             for test_file in $TEST_FILES; do
+              echo "============================================"
               echo "Running test: $test_file"
+              echo "============================================"
               vim -Nu NONE \
                 -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
                 -c "runtime plugin/tmc.vim" \
-                -c "Vader! $test_file" 2>&1 | tee -a test_output.log || echo "Test $test_file had issues (non-blocking)"
+                -c "Vader! $test_file" 2>&1 | tee -a test_output.log
+              if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                echo "FAILED: $test_file"
+                exit 1
+              fi
             done
           fi
-          echo "Test run completed"
-        continue-on-error: true
+          echo "All tests passed!"
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.vim }}-${{ matrix.os }}
           path: test_output.log
@@ -112,7 +124,7 @@ jobs:
       - name: Run vint
         run: |
           vint --version
-          vint autoload/ plugin/ || true
+          vint autoload/ plugin/
 
   docs:
     name: Validate documentation
