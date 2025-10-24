@@ -76,3 +76,18 @@ function! tmc#exercise#get_list(course_id) abort
   return l:exercises
 endfunction
 
+" Get only available (unlocked) exercise IDs
+function! tmc#exercise#get_available_ids(course_id) abort
+  let l:exercises = tmc#exercise#get_list(a:course_id)
+  let l:ids = []
+  
+  for ex in l:exercises
+    " Only include exercises that are unlocked
+    if has_key(ex, 'id') && get(ex, 'unlocked', v:false)
+      call add(l:ids, string(ex['id']))
+    endif
+  endfor
+  
+  return l:ids
+endfunction
+

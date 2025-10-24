@@ -23,11 +23,26 @@ function! tmc#download#course_exercises(course_id, org, cb) abort
     return
   endif
 
-  let l:exercise_ids = tmc#exercise#get_ids(a:course_id)
+  " Get all exercises and count locked vs available
+  let l:all_exercises = tmc#exercise#get_list(a:course_id)
+  let l:total_count = len(l:all_exercises)
+  
+  " Get only available (unlocked) exercises to avoid 403 Forbidden errors
+  let l:exercise_ids = tmc#exercise#get_available_ids(a:course_id)
+  let l:available_count = len(l:exercise_ids)
+  let l:locked_count = l:total_count - l:available_count
+  
   if empty(l:exercise_ids)
-    echom 'No exercises to download for course ' . a:course_id
+    call tmc#util#echo_info('No available exercises to download for course ' . a:course_id . ' (all ' . l:total_count . ' are locked)')
     call a:cb('')
     return
+  endif
+
+  " Show info about locked exercises
+  if l:locked_count > 0
+    call tmc#util#echo_info('Downloading ' . l:available_count . ' available exercises (skipping ' . l:locked_count . ' locked)')
+  else
+    call tmc#util#echo_info('Downloading all ' . l:available_count . ' exercises')
   endif
 
   " Initialize logs
