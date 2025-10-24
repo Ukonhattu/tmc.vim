@@ -74,7 +74,7 @@ jobs:
             vim -Nu NONE \
               -c "set runtimepath+=." \
               -c "runtime plugin/tmc.vim" \
-              -c "if exists(':TmcRunTests') | echo 'Plugin loaded successfully' | cquit 0 | else | echo 'Plugin failed to load' | cquit 1 | endif"
+              -c "if exists(':TmcRunTests') | echo 'Plugin loaded successfully' | qall! | else | echo 'Plugin failed to load' | cquit | endif"
           fi
 
       - name: Install Vader.vim
