@@ -8,22 +8,45 @@ on:
 
 jobs:
   test:
-    name: Test on ${{ matrix.vim }} (${{ matrix.os }})
+    name: Test on ${{ matrix.editor }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        vim:
-          - v8.2.0000
-          - v9.0.0000
-          - v0.5.0
-          - v0.9.0
-          - stable
-        exclude:
-          # Vim 8.2 might not be easily available on all platforms
+        include:
+          - os: ubuntu-latest
+            editor: vim-8.2
+            version: v8.2.0000
+            neovim: false
+          - os: ubuntu-latest
+            editor: vim-9.0
+            version: v9.0.0000
+            neovim: false
           - os: macos-latest
-            vim: v8.2.0000
+            editor: vim-9.0
+            version: v9.0.0000
+            neovim: false
+          - os: ubuntu-latest
+            editor: neovim-0.5
+            version: v0.5.0
+            neovim: true
+          - os: ubuntu-latest
+            editor: neovim-0.9
+            version: v0.9.0
+            neovim: true
+          - os: macos-latest
+            editor: neovim-0.9
+            version: v0.9.0
+            neovim: true
+          - os: ubuntu-latest
+            editor: neovim-stable
+            version: stable
+            neovim: true
+          - os: macos-latest
+            editor: neovim-stable
+            version: stable
+            neovim: true
     
     steps:
       - name: Checkout code
@@ -32,7 +55,8 @@ jobs:
       - name: Setup Vim/Neovim
         uses: rhysd/action-setup-vim@v1
         with:
-          version: ${{ matrix.vim }}
+          version: ${{ matrix.version }}
+          neovim: ${{ matrix.neovim }}
 
       - name: Smoke test - Plugin loads
         run: |
@@ -102,7 +126,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.vim }}-${{ matrix.os }}
+          name: test-results-${{ matrix.editor }}-${{ matrix.os }}
           path: test_output.log
 
   lint:
