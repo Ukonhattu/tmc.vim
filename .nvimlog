@@ -1,0 +1,5 @@
+WRN 2025-10-24T15:02:49.043 ?.79816    server_start:193: Failed to start server: operation not permitted: /var/folders/kd/3jjgqby51271pf01y3jhb2vh9mf65y/T/nvim.daxda/Yo4FTj/nvim.79816.0
+WRN 2025-10-24T15:02:58.480 ?.79879    server_start:193: Failed to start server: operation not permitted: /var/folders/kd/3jjgqby51271pf01y3jhb2vh9mf65y/T/nvim.daxda/HNrQq8/nvim.79879.0
+WRN 2025-10-24T15:03:07.420 ?.79927    server_start:193: Failed to start server: operation not permitted: /var/folders/kd/3jjgqby51271pf01y3jhb2vh9mf65y/T/nvim.daxda/hlqiZB/nvim.79927.0
+WRN 2025-10-24T15:03:16.385 ?.79964    server_start:193: Failed to start server: operation not permitted: /var/folders/kd/3jjgqby51271pf01y3jhb2vh9mf65y/T/nvim.daxda/uiaXQL/nvim.79964.0
+WRN 2025-10-24T15:03:23.862 ?.79998    server_start:193: Failed to start server: operation not permitted: /var/folders/kd/3jjgqby51271pf01y3jhb2vh9mf65y/T/nvim.daxda/hkRO9f/nvim.79998.0
