@@ -35,25 +35,11 @@ Fixes #
 - [ ] Tested manually in Vim
 - [ ] Tested manually in Neovim
 
-### Test Commands Run
-```bash
-# List the test commands you ran
-vim -Nu NONE -c "Vader! test/**/*.vader"
-vint autoload/ plugin/
-```
-
 ## Documentation
 - [ ] Updated README.md (if needed)
 - [ ] Updated doc/tmc.txt (if needed)
 - [ ] Updated CONTRIBUTING.md (if needed)
 - [ ] Added/updated code comments
-
-## Code Quality
-- [ ] My code follows the project's code style guidelines
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] My changes generate no new warnings or errors
-- [ ] Linter passes without errors (`vint autoload/ plugin/`)
 
 ## Breaking Changes
 <!-- If this is a breaking change, describe what breaks and how to migrate -->
@@ -63,14 +49,6 @@ N/A or:
 
 ## Screenshots/Demos
 <!-- If applicable, add screenshots or demo GIFs to help explain your changes -->
-
-## Checklist
-- [ ] I have read the CONTRIBUTING.md document
-- [ ] My code follows the code style of this project
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] All new and existing tests pass
-- [ ] I have updated the documentation accordingly
-- [ ] I have checked my code and corrected any misspellings
 
 ## Additional Notes
 <!-- Add any additional notes or context about the PR here -->
