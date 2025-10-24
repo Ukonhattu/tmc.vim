@@ -9,6 +9,9 @@ After:
   call helpers#teardown()
 
 Execute (Backward compatibility: old API functions should exist):
+  " Load the backward compatibility layer explicitly
+  runtime autoload/tmc.vim
+  
   " Test that the backward compatibility functions exist and are callable
   " We can't mock the CLI layer in tests due to autoload naming constraints,
   " so we just verify the functions exist
