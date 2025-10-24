@@ -97,8 +97,10 @@ jobs:
               echo "Running test: $test_file"
               echo "============================================"
               nvim --headless -u NONE \
-                -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
-                -c "runtime plugin/tmc.vim" \
+                -c "set runtimepath^=~/.vim/plugged/vader.vim" \
+                -c "set runtimepath^=." \
+                -c "filetype plugin indent on" \
+                -c "runtime! plugin/**/*.vim" \
                 -c "Vader! $test_file" 2>&1 | tee -a test_output.log
               if [ ${PIPESTATUS[0]} -ne 0 ]; then
                 echo "FAILED: $test_file"
@@ -112,8 +114,10 @@ jobs:
               echo "Running test: $test_file"
               echo "============================================"
               vim -Nu NONE \
-                -c "set runtimepath+=.,~/.vim/plugged/vader.vim" \
-                -c "runtime plugin/tmc.vim" \
+                -c "set runtimepath^=~/.vim/plugged/vader.vim" \
+                -c "set runtimepath^=." \
+                -c "filetype plugin indent on" \
+                -c "runtime! plugin/**/*.vim" \
                 -c "Vader! $test_file" 2>&1 | tee -a test_output.log
               if [ ${PIPESTATUS[0]} -ne 0 ]; then
                 echo "FAILED: $test_file"
