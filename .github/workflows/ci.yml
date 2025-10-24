@@ -15,15 +15,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         vim:
-          - vim-8.2
-          - vim-9.0
-          - neovim-0.5
-          - neovim-0.9
-          - neovim-stable
+          - v8.2.0000
+          - v9.0.0000
+          - v0.5.0
+          - v0.9.0
+          - stable
         exclude:
           # Vim 8.2 might not be easily available on all platforms
           - os: macos-latest
-            vim: vim-8.2
+            vim: v8.2.0000
     
     steps:
       - name: Checkout code
